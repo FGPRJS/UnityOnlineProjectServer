@@ -21,8 +21,10 @@ namespace UnityOnlineProjectServer.Connection
                 ProtocolType.Tcp);
         }
 
-        public void OpenLocal()
+        public void Start()
         {
+            Console.WriteLine("Server Start");
+
             IPHostEntry ipHostInfo = Dns.GetHostEntry(Dns.GetHostName());
             IPAddress ipAddress = ipHostInfo.AddressList[0];
             IPEndPoint localEndPoint = new IPEndPoint(ipAddress, 11000);
@@ -43,6 +45,30 @@ namespace UnityOnlineProjectServer.Connection
             }
         }
 
+        public void StartLocal()
+        {
+            Console.WriteLine("Server Open");
+
+            IPHostEntry ipHostInfo = Dns.GetHostEntry("localhost");
+            IPAddress ipAddress = ipHostInfo.AddressList[1];
+            IPEndPoint localEndPoint = new IPEndPoint(ipAddress, 11000);
+
+            try
+            {
+                socket.Bind(localEndPoint);
+                socket.Listen(PendingConnectionQueueCount);
+
+                while (true)
+                {
+                    socket.BeginAccept(ClientAccepted, new AsyncStateObject());
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Open Failed. Reason : " + ex.Message);
+            }
+        }
+
         private void ClientAccepted(IAsyncResult ar)
         {
             // Get the socket that handles the client request.  
@@ -55,6 +81,11 @@ namespace UnityOnlineProjectServer.Connection
         public void SendData()
         {
 
+        }
+
+        public void ShutDown()
+        {
+            socket.Close();
         }
     }
 }
