@@ -1,8 +1,11 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using UnityOnlineProjectProtocol;
+using UnityOnlineProjectProtocol.Protocol;
 
 namespace UnityOnlineProjectServer.Connection
 {
@@ -10,7 +13,10 @@ namespace UnityOnlineProjectServer.Connection
     {
         public Socket socket;
 
-        private int PendingConnectionQueueCount = 100;
+        private long clientCount = 100;
+        private ConcurrentDictionary<long, ConnectedClient> clients;
+
+        private int pendingConnectionQueueCount = 100;
         public int Port = 8080;
 
         public Server()
@@ -20,6 +26,15 @@ namespace UnityOnlineProjectServer.Connection
                 AddressFamily.InterNetwork, 
                 SocketType.Stream, 
                 ProtocolType.Tcp);
+
+            //Create Clients
+            clients = new ConcurrentDictionary<long, ConnectedClient>();
+
+            for(long i = 0; i < clientCount; i++)
+            {
+                var client = new ConnectedClient(i);
+                clients.TryAdd(i, client);
+            }
         }
 
         public void Start()
@@ -49,7 +64,7 @@ namespace UnityOnlineProjectServer.Connection
             try
             {
                 socket.Bind(endPoint);
-                socket.Listen(PendingConnectionQueueCount);
+                socket.Listen(pendingConnectionQueueCount);
                 socket.BeginAccept(ClientAccepted, socket);
             }
             catch (Exception ex)
@@ -63,18 +78,29 @@ namespace UnityOnlineProjectServer.Connection
             // Get the socket that handles the client request.  
             var clientSocket = (Socket)ar.AsyncState;
             Socket handler = clientSocket.EndAccept(ar);
+            // Wait for other Client
+            socket.BeginAccept(ClientAccepted, socket);
+
+            for (long i = 0; i < clients.Count; i++)
+            {
+                if(clients[i].socket == null)
+                {
+                    clients[i].Initialize(handler);
+                }
+            }
+            
 
             Console.WriteLine("Client Connected");
         }
 
-        public void SendDataTo(Socket handler, String data)
+        public void SendDataTo(Socket handler, CommunicationMessage message)
         {
             // Convert the string data to byte data using ASCII encoding.  
-            byte[] byteData = Encoding.ASCII.GetBytes(data);
+            var byteData = CommunicationUtility.Serialize(message);
 
             // Begin sending the data to the remote device.  
             handler.BeginSend(byteData, 0, byteData.Length, 0,
-                new AsyncCallback(SendCallback), handler);
+                new AsyncCallback(SendCallback), socket);
         }
 
         private void SendCallback(IAsyncResult ar)
@@ -87,20 +113,34 @@ namespace UnityOnlineProjectServer.Connection
                 // Complete sending the data to the remote device.  
                 int bytesSent = handler.EndSend(ar);
                 Console.WriteLine("Sent {0} bytes to client.", bytesSent);
-
-                handler.Shutdown(SocketShutdown.Both);
-                handler.Close();
-
             }
             catch (Exception e)
             {
-                Console.WriteLine(e.ToString());
+                Console.WriteLine("Send Failed. Reason : " + e.Message);
             }
         }
 
         public void ShutDown()
         {
-            
+            Console.WriteLine("ShutDown Server...");
+
+            //All ShutDown
+            for (long i = 0; i < clients.Count; i++)
+            {
+                var client = clients[i];
+
+                if (client.socket != null)
+                {
+                    client.socket.Shutdown(SocketShutdown.Both);
+                    client.socket.Close();
+                    client.socket = null;
+                }
+            }
+
+            socket.Shutdown(SocketShutdown.Both);
+            socket.Close();
+
+            Console.WriteLine("ShutDown Complete!");
         }
     }
 }
