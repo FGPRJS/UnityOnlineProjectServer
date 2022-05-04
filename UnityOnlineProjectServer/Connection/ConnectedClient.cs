@@ -38,38 +38,78 @@ namespace UnityOnlineProjectServer.Connection
             heartbeat = new Heartbeat();
             heartbeat.HeartbeatTimeOutEvent += () => { ShutDownRequest(); };
             heartbeat.HeartbeatTickEvent += () => { SendData(Heartbeat.heartbeatMessageByteData); };
-
-            socket.BeginReceive(
-                receiveBuffer, 
-                0,
-                receiveBuffer.Length, 
-                SocketFlags.None, 
-                DataReceived, 
-                socket);
+            
+            BeginReceive();
         }
 
-        private void DataReceived(IAsyncResult ar)
+        void BeginReceive()
         {
-            var receivedMessage = CommunicationUtility.Deserialize(receiveBuffer);
-            Console.WriteLine(receivedMessage.Message);
+            try
+            {
+                ClientSocket.BeginReceive(
+                receiveBuffer,
+                0,
+                receiveBuffer.Length,
+                SocketFlags.None,
+                DataReceivedCallback,
+                ClientSocket);
+            }
+            catch(NullReferenceException ne)
+            {
+                Console.WriteLine("ClientSocket Lost");
+            }
+            catch(SocketException se)
+            {
+                Console.WriteLine("Socket is not available. Shutdown Client.");
+                ShutDownRequest();
+            }
+        }
 
-            ClientSocket.EndReceive(ar);
+        private void DataReceivedCallback(IAsyncResult ar)
+        {
+            try
+            {
+                var receivedMessage = CommunicationUtility.Deserialize(receiveBuffer);
+                Console.WriteLine(receivedMessage.Message);
+
+                ClientSocket.EndReceive(ar);
+                heartbeat.ResetHeartbeat();
+                BeginReceive();
+            }
+            catch
+            {
+                throw;
+            }
         }
 
         #region Send Data
         internal void SendData(CommunicationMessage message)
         {
-            var byteData = CommunicationUtility.Serialize(message);
+            try
+            {
+                var byteData = CommunicationUtility.Serialize(message);
 
-            SendData(byteData);
+                SendData(byteData);
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine("Cannot send Data. Reason : " + ex.Message);
+            }
         }
 
         internal void SendData(byte[] byteData)
         {
-            Console.WriteLine("Send data to client.");
+            try
+            {
+                Console.WriteLine("Send data to client.");
 
-            ClientSocket.BeginSend(byteData, 0, byteData.Length, 0,
-                new AsyncCallback(SendCallback), ClientSocket);
+                ClientSocket?.BeginSend(byteData, 0, byteData.Length, 0,
+                    new AsyncCallback(SendCallback), ClientSocket);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Cannot send Data. Reason : " + ex.Message);
+            }
         }
 
         private void SendCallback(IAsyncResult ar)
