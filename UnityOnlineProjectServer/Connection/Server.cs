@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using UnityOnlineProjectProtocol;
 using UnityOnlineProjectProtocol.Protocol;
 
@@ -11,15 +13,16 @@ namespace UnityOnlineProjectServer.Connection
 {
     internal class Server
     {
-        public Socket socket;
+        internal bool isRun;
+        internal Socket socket;
 
-        private long clientCount = 100;
+        private long clientCount = 1;
         private ConcurrentDictionary<long, ConnectedClient> clients;
 
         private int pendingConnectionQueueCount = 100;
-        public int Port = 8080;
+        internal int Port = 8080;
 
-        public Server()
+        internal Server()
         {
             // Create Socket
             socket = new Socket(
@@ -33,11 +36,12 @@ namespace UnityOnlineProjectServer.Connection
             for(long i = 0; i < clientCount; i++)
             {
                 var client = new ConnectedClient(i);
+                client.ShutdownRequestEvent += (id) => { ShutDownClient(id); };
                 clients.TryAdd(i, client);
             }
         }
 
-        public void Start()
+        internal void Start()
         {
             Console.WriteLine("Server Start");
 
@@ -48,7 +52,7 @@ namespace UnityOnlineProjectServer.Connection
             OpenServer(endPoint);
         }
 
-        public void StartLocal()
+        internal void StartLocal()
         {
             Console.WriteLine("Server Start");
 
@@ -66,6 +70,8 @@ namespace UnityOnlineProjectServer.Connection
                 socket.Bind(endPoint);
                 socket.Listen(pendingConnectionQueueCount);
                 socket.BeginAccept(ClientAccepted, socket);
+                isRun = true;
+                InitializeHeartBeatTask();
             }
             catch (Exception ex)
             {
@@ -83,7 +89,7 @@ namespace UnityOnlineProjectServer.Connection
 
             for (long i = 0; i < clients.Count; i++)
             {
-                if(clients[i].socket == null)
+                if(clients[i].ClientSocket == null)
                 {
                     clients[i].Initialize(handler);
                 }
@@ -93,54 +99,94 @@ namespace UnityOnlineProjectServer.Connection
             Console.WriteLine("Client Connected");
         }
 
-        public void SendDataTo(Socket handler, CommunicationMessage message)
+        #region HeartBeat
+
+        private CancellationTokenSource heartbeatCancellationTokenSource;
+        private CancellationToken heartbeatCancellationToken;
+        private Task heartbeatTask;
+        private void InitializeHeartBeatTask()
         {
-            // Convert the string data to byte data using ASCII encoding.  
-            var byteData = CommunicationUtility.Serialize(message);
+            heartbeatCancellationTokenSource = new CancellationTokenSource();
+            heartbeatCancellationToken = heartbeatCancellationTokenSource.Token;
 
-            // Begin sending the data to the remote device.  
-            handler.BeginSend(byteData, 0, byteData.Length, 0,
-                new AsyncCallback(SendCallback), socket);
+            heartbeatTask = new Task(new Action(async () =>
+            {
+                while (isRun)
+                {
+                    await Task.Delay(Heartbeat.heartbeatInterval);
+                    CheckHeartBeat();
+                }
+            }), heartbeatCancellationToken);
+            heartbeatTask.Start();
         }
-
-        private void SendCallback(IAsyncResult ar)
+        private void CancelHeartBeatTask()
         {
             try
             {
-                // Retrieve the socket from the state object.  
-                Socket handler = (Socket)ar.AsyncState;
+                //Cancel heartbeat. if already cancellationrequested, cancel
+                heartbeatCancellationToken.ThrowIfCancellationRequested();
 
-                // Complete sending the data to the remote device.  
-                int bytesSent = handler.EndSend(ar);
-                Console.WriteLine("Sent {0} bytes to client.", bytesSent);
+                heartbeatCancellationTokenSource.Cancel();
             }
-            catch (Exception e)
+            catch(Exception ex)
             {
-                Console.WriteLine("Send Failed. Reason : " + e.Message);
+                Console.WriteLine("Cancel HeartBeatTask is already requested.");
+            }
+        }
+        private void CheckHeartBeat()
+        {
+            for(long i = 0; i < clientCount; i++)
+            {
+                var client = clients[i];
+                if (client.ClientSocket == null) continue;
+
+                client.heartbeat.CountHeartbeat(Heartbeat.heartbeatInterval);
             }
         }
 
-        public void ShutDown()
+        #endregion
+
+        #region ShutDown
+        internal void ShutDownClient(long id)
         {
-            Console.WriteLine("ShutDown Server...");
+            var client = clients[id];
+
+            if (client.ClientSocket != null)
+            {
+                client.ClientSocket.Shutdown(SocketShutdown.Both);
+                client.ClientSocket.Close();
+                client.ClientSocket = null;
+            }
+        }
+
+        internal void ShutDownAllClients()
+        {
+            Console.WriteLine("ShutDown clients...");
 
             //All ShutDown
             for (long i = 0; i < clients.Count; i++)
             {
-                var client = clients[i];
-
-                if (client.socket != null)
-                {
-                    client.socket.Shutdown(SocketShutdown.Both);
-                    client.socket.Close();
-                    client.socket = null;
-                }
+                ShutDownClient(clients[i].id);
             }
 
+            Console.WriteLine("ShutDown clients complete!");
+        }
+
+        internal void ShutDownServer()
+        {
+            Console.WriteLine("Shutdown server...");
+
+            ShutDownAllClients();
+
+            isRun = false;
+            CancelHeartBeatTask();
+
+            //Server ShutDown
             socket.Shutdown(SocketShutdown.Both);
             socket.Close();
 
-            Console.WriteLine("ShutDown Complete!");
+            Console.WriteLine("Shutdown server complete!");
         }
+        #endregion
     }
 }
