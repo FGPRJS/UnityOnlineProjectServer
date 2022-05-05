@@ -8,8 +8,8 @@ namespace UnityOnlineProjectServer.Connection
 {
     internal class Heartbeat
     {
-        internal const int heartbeatInterval = 3000;
-        internal const int heartbeatTimeout = 18000;
+        internal const int heartbeatInterval = 30000;
+        internal const int heartbeatTimeout = 180000;
 
         internal int currentHeartbeatTime = 0;
 
@@ -19,7 +19,7 @@ namespace UnityOnlineProjectServer.Connection
         internal delegate void HeartbeatTick();
         internal event HeartbeatTick HeartbeatTickEvent;
 
-        internal static CommunicationMessage heartbeatMessage;
+        internal static CommunicationMessage<Dictionary<string, string>> heartbeatMessage;
         internal static byte[] heartbeatMessageByteData;
 
 
@@ -28,9 +28,12 @@ namespace UnityOnlineProjectServer.Connection
         {
             if ((heartbeatMessage != null) && (heartbeatMessageByteData != null)) return;
 
-            heartbeatMessage = new CommunicationMessage()
+            heartbeatMessage = new CommunicationMessage<Dictionary<string, string>>()
             {
-                MessageType = CommandType.HeartBeatRequest
+                header = new Header()
+                {
+                    MessageName = MessageType.HeartBeatRequest.ToString()
+                }
             };
 
             heartbeatMessageByteData = CommunicationUtility.Serialize(heartbeatMessage);

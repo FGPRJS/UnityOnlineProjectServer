@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Text;
@@ -13,12 +14,14 @@ namespace UnityOnlineProjectServer.Connection
         internal Socket ClientSocket;
 
         internal Heartbeat heartbeat;
+        internal Player player;
 
         public readonly long id;
         private byte[] receiveBuffer;
 
         internal event ShutdownRequest ShutdownRequestEvent;
         internal delegate void ShutdownRequest(long id);
+
 
         internal ConnectedClient(long id)
         {
@@ -34,11 +37,34 @@ namespace UnityOnlineProjectServer.Connection
             receiveBuffer = new byte[socket.ReceiveBufferSize];
 
             heartbeat = new Heartbeat();
-            heartbeat.HeartbeatTimeOutEvent += () => { ShutDownRequest(); };
-            heartbeat.HeartbeatTickEvent += () => { SendData(Heartbeat.heartbeatMessageByteData); };
-            
+            heartbeat.HeartbeatTimeOutEvent += HeartbeatTimeOutEventAction;
+            heartbeat.HeartbeatTickEvent += HeartbeatTickEventAction;
+
+            //Player
+            player = new Player();
+            player.SendMessageRequestEvent += SendMessageRequestEventAction;
+
             BeginReceive();
         }
+
+        #region Event Action
+
+        void HeartbeatTimeOutEventAction()
+        {
+            ShutDownRequest();
+        }
+
+        void HeartbeatTickEventAction()
+        {
+            SendData(Heartbeat.heartbeatMessageByteData);
+        }
+
+        void SendMessageRequestEventAction(CommunicationMessage<Dictionary<string, string>> message) 
+        {
+            SendData(message);
+        }
+
+        #endregion
 
         void BeginReceive()
         {
@@ -72,9 +98,10 @@ namespace UnityOnlineProjectServer.Connection
                 if(bytesRead > 0)
                 {
                     var receivedMessage = CommunicationUtility.Deserialize(receiveBuffer);
-                    Console.WriteLine(receivedMessage?.Message);
-
+                    Console.WriteLine("Received Message : " + JsonConvert.SerializeObject(receivedMessage));
+                    Array.Clear(receiveBuffer, 0, receiveBuffer.Length);
                     heartbeat.ResetHeartbeat();
+                    player.ProcessMessage(receivedMessage);
                 }
                 
                 BeginReceive();
@@ -91,7 +118,7 @@ namespace UnityOnlineProjectServer.Connection
         }
 
         #region Send Data
-        internal void SendData(CommunicationMessage message)
+        internal void SendData(CommunicationMessage<Dictionary<string,string>> message)
         {
             try
             {
@@ -140,6 +167,12 @@ namespace UnityOnlineProjectServer.Connection
 
         internal async void ShutDownRequest()
         {
+            //Clear Event
+            heartbeat.HeartbeatTimeOutEvent -= HeartbeatTimeOutEventAction;
+            heartbeat.HeartbeatTickEvent -= HeartbeatTickEventAction;
+
+            player.SendMessageRequestEvent -= SendMessageRequestEventAction;
+
             var workTask = Task.Run(() =>
             {
                 ShutdownRequestEvent.Invoke(id);
