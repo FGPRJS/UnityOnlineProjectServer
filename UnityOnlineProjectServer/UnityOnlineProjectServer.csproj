@@ -9,10 +9,4 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Reference Include="UnityOnlineProjectProtocol">
-      <HintPath>..\..\UnityOnlineProjectProtocol\UnityOnlineProjectProtocol\UnityOnlineProjectProtocol\bin\Debug\UnityOnlineProjectProtocol.dll</HintPath>
-    </Reference>
-  </ItemGroup>
-
 </Project>

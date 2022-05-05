@@ -2,8 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
-using UnityOnlineProjectProtocol;
-using UnityOnlineProjectProtocol.Protocol;
+using UnityOnlineProjectServer.Protocol;
 
 namespace UnityOnlineProjectServer.Connection
 {

@@ -6,8 +6,6 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using UnityOnlineProjectProtocol;
-using UnityOnlineProjectProtocol.Protocol;
 
 namespace UnityOnlineProjectServer.Connection
 {
@@ -139,6 +137,7 @@ namespace UnityOnlineProjectServer.Connection
             {
                 var client = clients[i];
                 if (client.ClientSocket == null) continue;
+                if (client.heartbeat == null) continue;
 
                 client.heartbeat.CountHeartbeat(Heartbeat.heartbeatInterval);
             }

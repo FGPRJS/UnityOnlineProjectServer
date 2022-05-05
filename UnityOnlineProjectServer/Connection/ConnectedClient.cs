@@ -4,9 +4,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using UnityOnlineProjectProtocol;
-using UnityOnlineProjectProtocol.Connection;
-using UnityOnlineProjectProtocol.Protocol;
+using UnityOnlineProjectServer.Protocol;
 
 namespace UnityOnlineProjectServer.Connection
 {
@@ -69,16 +67,26 @@ namespace UnityOnlineProjectServer.Connection
         {
             try
             {
-                var receivedMessage = CommunicationUtility.Deserialize(receiveBuffer);
-                Console.WriteLine(receivedMessage.Message);
+                int bytesRead = ClientSocket.EndReceive(ar);
 
-                ClientSocket.EndReceive(ar);
-                heartbeat.ResetHeartbeat();
+                if(bytesRead > 0)
+                {
+                    var receivedMessage = CommunicationUtility.Deserialize(receiveBuffer);
+                    Console.WriteLine(receivedMessage?.Message);
+
+                    heartbeat.ResetHeartbeat();
+                }
+                
                 BeginReceive();
             }
-            catch
+            catch (NullReferenceException)
             {
-                throw;
+                Console.WriteLine("ClientSocket Lost");
+            }
+            catch (SocketException)
+            {
+                Console.WriteLine("Socket is not available. Shutdown Client.");
+                ShutDownRequest();
             }
         }
 
