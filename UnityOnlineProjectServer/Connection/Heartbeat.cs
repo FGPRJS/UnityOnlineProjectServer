@@ -8,10 +8,11 @@ namespace UnityOnlineProjectServer.Connection
 {
     internal class Heartbeat
     {
-        internal const int heartbeatInterval = 30000;
-        internal const int heartbeatTimeout = 180000;
+        private const int HeartbeatInterval = 5000;
+        private const int MaxHeartbeatTimeoutCount = 3;
 
-        internal int currentHeartbeatTime = 0;
+        private int _currentHeartbeatTime = 0;
+        private int _currentHeartbeatTimeoutCount = 0;
 
         internal delegate void HeartbeatTimeOut();
         internal event HeartbeatTimeOut HeartbeatTimeOutEvent;
@@ -39,32 +40,28 @@ namespace UnityOnlineProjectServer.Connection
             heartbeatMessageByteData = CommunicationUtility.Serialize(heartbeatMessage);
         }
 
-        internal async void CountHeartbeat(int interval)
+        internal void CountHeartbeat(int interval)
         {
-            currentHeartbeatTime += interval;
+            _currentHeartbeatTime += interval;
 
-            //Instead of BeginInvoke
-            var workTask = Task.Run(() =>
+            if(_currentHeartbeatTime >= HeartbeatInterval)
             {
-                HeartbeatTickEvent.Invoke();
-            });
-            await workTask;
+                _currentHeartbeatTime = 0;
+                HeartbeatTickEvent?.Invoke();
+                _currentHeartbeatTimeoutCount++;
+            }
 
-            if (currentHeartbeatTime >= heartbeatTimeout)
+            if (_currentHeartbeatTimeoutCount >= MaxHeartbeatTimeoutCount)
             {
-                currentHeartbeatTime = 0;
-                //Instead of BeginInvoke
-                workTask = Task.Run(() =>
-                {
-                    HeartbeatTimeOutEvent.Invoke();
-                });
-                await workTask;
+                _currentHeartbeatTimeoutCount = 0;
+                HeartbeatTimeOutEvent?.Invoke();
             }
         }
 
         internal void ResetHeartbeat()
         {
-            currentHeartbeatTime = 0;
+            _currentHeartbeatTime = 0;
+            _currentHeartbeatTimeoutCount = 0;
         }
     }
 }

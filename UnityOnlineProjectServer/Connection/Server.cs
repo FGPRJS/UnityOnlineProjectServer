@@ -69,7 +69,7 @@ namespace UnityOnlineProjectServer.Connection
                 socket.Listen(pendingConnectionQueueCount);
                 socket.BeginAccept(ClientAccepted, socket);
                 isRun = true;
-                InitializeHeartBeatTask();
+                InitializeGlobalServerTask();
             }
             catch (Exception ex)
             {
@@ -97,49 +97,61 @@ namespace UnityOnlineProjectServer.Connection
             Console.WriteLine("Client Connected");
         }
 
-        #region HeartBeat
+        #region Global Tick Task
 
-        private CancellationTokenSource heartbeatCancellationTokenSource;
-        private CancellationToken heartbeatCancellationToken;
-        private Task heartbeatTask;
-        private void InitializeHeartBeatTask()
+        private CancellationTokenSource _globalServerTaskCancellationTokenSource;
+        private CancellationToken _globalServerTaskCancellationToken;
+        private Task _globalServerTask;
+        private int _tickInterval = 100;
+
+        private void InitializeGlobalServerTask()
         {
-            heartbeatCancellationTokenSource = new CancellationTokenSource();
-            heartbeatCancellationToken = heartbeatCancellationTokenSource.Token;
+            if (_globalServerTaskCancellationTokenSource != null)
+            {
+                CancelGlobalServerTask();
+            }
+            else
+            {
+                _globalServerTaskCancellationTokenSource = new CancellationTokenSource();
+                _globalServerTaskCancellationToken = _globalServerTaskCancellationTokenSource.Token;
+            }
 
-            heartbeatTask = new Task(new Action(async () =>
+            _globalServerTask = new Task(new Action(async () =>
             {
                 while (isRun)
                 {
-                    await Task.Delay(Heartbeat.heartbeatInterval);
-                    CheckHeartBeat();
+                    await Task.Delay(_tickInterval);
+
+                    //Tick Action
+
+                    CheckHeartBeat(_tickInterval);
                 }
-            }), heartbeatCancellationToken);
-            heartbeatTask.Start();
+            }), _globalServerTaskCancellationToken);
+
+            _globalServerTask.Start();
         }
-        private void CancelHeartBeatTask()
+
+        private void CancelGlobalServerTask()
         {
             try
             {
                 //Cancel heartbeat. if already cancellationrequested, cancel
-                heartbeatCancellationToken.ThrowIfCancellationRequested();
+                _globalServerTaskCancellationToken.ThrowIfCancellationRequested();
 
-                heartbeatCancellationTokenSource.Cancel();
+                _globalServerTaskCancellationTokenSource.Cancel();
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-                Console.WriteLine("Cancel HeartBeatTask is already requested.");
+                Console.WriteLine("Cancel GlobalTask is already requested.");
             }
         }
-        private void CheckHeartBeat()
+        private void CheckHeartBeat(int interval)
         {
             for(long i = 0; i < clientCount; i++)
             {
                 var client = clients[i];
-                if (client.ClientSocket == null) continue;
-                if (client.heartbeat == null) continue;
 
-                client.heartbeat.CountHeartbeat(Heartbeat.heartbeatInterval);
+                client?.heartbeat?.CountHeartbeat(interval);
             }
         }
 
@@ -178,7 +190,7 @@ namespace UnityOnlineProjectServer.Connection
             ShutDownAllClients();
 
             isRun = false;
-            CancelHeartBeatTask();
+            CancelGlobalServerTask();
 
             //Server ShutDown
             socket.Shutdown(SocketShutdown.Both);

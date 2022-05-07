@@ -12,12 +12,12 @@ namespace UnityOnlineProjectServer.Connection
     internal class ConnectedClient
     {
         internal Socket ClientSocket;
+        internal DataFrame Frame;
 
         internal Heartbeat heartbeat;
         internal Player player;
 
         public readonly long id;
-        private byte[] receiveBuffer;
 
         internal event ShutdownRequest ShutdownRequestEvent;
         internal delegate void ShutdownRequest(long id);
@@ -30,11 +30,11 @@ namespace UnityOnlineProjectServer.Connection
 
         internal void Initialize(Socket socket)
         {
-            this.ClientSocket = socket;
-            socket.ReceiveBufferSize = AsyncStateObject.BufferSize;
-            socket.SendBufferSize = AsyncStateObject.BufferSize;
+            Frame = new DataFrame();
 
-            receiveBuffer = new byte[socket.ReceiveBufferSize];
+            this.ClientSocket = socket;
+            socket.ReceiveBufferSize = DataFrame.BufferSize;
+            socket.SendBufferSize = DataFrame.BufferSize;
 
             heartbeat = new Heartbeat();
             heartbeat.HeartbeatTimeOutEvent += HeartbeatTimeOutEventAction;
@@ -70,10 +70,10 @@ namespace UnityOnlineProjectServer.Connection
         {
             try
             {
-                ClientSocket.BeginReceive(
-                receiveBuffer,
+                ClientSocket?.BeginReceive(
+                Frame.buffer,
                 0,
-                receiveBuffer.Length,
+                DataFrame.BufferSize,
                 SocketFlags.None,
                 DataReceivedCallback,
                 ClientSocket);
@@ -97,18 +97,60 @@ namespace UnityOnlineProjectServer.Connection
 
                 if(bytesRead > 0)
                 {
-                    var receivedMessage = CommunicationUtility.Deserialize(receiveBuffer);
-                    Console.WriteLine("Received Message : " + JsonConvert.SerializeObject(receivedMessage));
-                    Array.Clear(receiveBuffer, 0, receiveBuffer.Length);
-                    heartbeat.ResetHeartbeat();
-                    player.ProcessMessage(receivedMessage);
+                    for (var i = 0; i < bytesRead; i++)
+                    {
+                        switch (Frame.buffer[i])
+                        {
+                            case 0x01:
+
+                                if (!Frame.SOF)
+                                {
+                                    Frame.SOF = true;
+                                }
+                                //Already SOF exist => discard before data
+                                else
+                                {
+                                    Frame.ResetDataFrame();
+                                }
+
+                                break;
+
+                            case 0x02:
+
+                                if (Frame.SOF)
+                                {
+                                    var completeData = Frame.GetByteData();
+                                    var receivedMessage = CommunicationUtility.Deserialize(completeData);
+                                    player.ProcessMessage(receivedMessage);
+                                }
+                                //Incomplete Message. Discard
+                                Frame.ResetDataFrame();
+
+
+                                break;
+
+                            default:
+
+                                if (Frame.SOF)
+                                {
+                                    Frame.AddByte(Frame.buffer[i]);
+                                }
+
+                                break;
+                        }
+                    }
                 }
-                
+
+                heartbeat.ResetHeartbeat();
                 BeginReceive();
             }
             catch (NullReferenceException)
             {
                 Console.WriteLine("ClientSocket Lost");
+            }
+            catch (ObjectDisposedException)
+            {
+                Console.WriteLine("ClientSocket is Disposed");
             }
             catch (SocketException)
             {
@@ -138,8 +180,20 @@ namespace UnityOnlineProjectServer.Connection
             {
                 Console.WriteLine("Send data to client.");
 
-                ClientSocket?.BeginSend(byteData, 0, byteData.Length, 0,
-                    new AsyncCallback(SendCallback), ClientSocket);
+                var sendData = new byte[byteData.Length + 2];
+                //Set SOF
+                sendData[0] = 0x01;
+                Array.Copy(byteData, 0, sendData, 1, byteData.Length);
+                //Set EOF
+                sendData[^1] = 0x02;
+
+                ClientSocket?.BeginSend(
+                    sendData,
+                    0,
+                    sendData.Length,
+                    SocketFlags.None,
+                    SendCallback,
+                    ClientSocket);
             }
             catch (Exception ex)
             {
@@ -165,7 +219,7 @@ namespace UnityOnlineProjectServer.Connection
         }
         #endregion
 
-        internal async void ShutDownRequest()
+        internal void ShutDownRequest()
         {
             //Clear Event
             heartbeat.HeartbeatTimeOutEvent -= HeartbeatTimeOutEventAction;
@@ -173,11 +227,9 @@ namespace UnityOnlineProjectServer.Connection
 
             player.SendMessageRequestEvent -= SendMessageRequestEventAction;
 
-            var workTask = Task.Run(() =>
-            {
-                ShutdownRequestEvent.Invoke(id);
-            });
-            await workTask;
+            Frame.ResetDataFrame();
+
+            ShutdownRequestEvent.Invoke(id);
         }
     }
 }

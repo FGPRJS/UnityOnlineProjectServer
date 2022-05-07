@@ -4,14 +4,26 @@ using System.Text;
 
 namespace UnityOnlineProjectServer.Protocol
 {
-    [Serializable]
     public enum MessageType
     {
         LoginRequest,
-        HeartBeatRequest
+        HeartBeatRequest,
+        TankSpawnRequest,
+        TankSpawnSpawnReport,
+        GameObjectDestroyRequest,
+        TankPositionReport,
+        GameObjectActionRequest,
+        PlayerChatReport
     }
 
-    [Serializable]
+    public enum TankType
+    {
+        Red = 0,
+        Yellow,
+        Green,
+        Blue
+    }
+
     public enum ACK
     {
         None = 0,
