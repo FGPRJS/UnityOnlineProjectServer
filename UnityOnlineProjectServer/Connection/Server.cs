@@ -123,8 +123,15 @@ namespace UnityOnlineProjectServer.Connection
                     await Task.Delay(_tickInterval);
 
                     //Tick Action
-
-                    CheckHeartBeat(_tickInterval);
+                    
+                    for (long i = 0; i < clientCount; i++)
+                    {
+                        var client = clients[i];
+                        //CheckHeartbeat
+                        client?.heartbeat?.CountTick(_tickInterval);
+                        //CheckPositionReport
+                        client?.positionReport?.CountTick(_tickInterval);
+                    }
                 }
             }), _globalServerTaskCancellationToken);
 
@@ -143,15 +150,6 @@ namespace UnityOnlineProjectServer.Connection
             catch (Exception ex)
             {
                 Console.WriteLine("Cancel GlobalTask is already requested.");
-            }
-        }
-        private void CheckHeartBeat(int interval)
-        {
-            for(long i = 0; i < clientCount; i++)
-            {
-                var client = clients[i];
-
-                client?.heartbeat?.CountHeartbeat(interval);
             }
         }
 
