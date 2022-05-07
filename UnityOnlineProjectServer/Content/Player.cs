@@ -15,8 +15,47 @@ namespace UnityOnlineProjectServer.Connection
         public TankData playerData;
         public static Dictionary<string, Player> PlayerMap = new Dictionary<string, Player>();
 
+        internal PositionReport positionReport;
+
         public delegate void SendMessageRequest(CommunicationMessage<Dictionary<string, string>> message);
         public event SendMessageRequest SendMessageRequestEvent;
+
+        public Player()
+        {
+            //Position Report
+            positionReport = new PositionReport();
+            positionReport.TickEvent += PositionReportTickEventAction;
+        }
+
+        ~Player()
+        {
+            positionReport.TickEvent -= PositionReportTickEventAction;
+        }
+
+        private void PositionReportTickEventAction()
+        {
+            if (playerData == null) return;
+
+            var message = new CommunicationMessage<Dictionary<string, string>>()
+            {
+                header = new Header()
+                {
+                    MessageName = MessageType.TankPositionReport.ToString()
+                },
+                body = new Body<Dictionary<string, string>>()
+                {
+                    Any = new Dictionary<string, string>()
+                    {
+                        ["Position"] = playerData.Position.ToString(),
+                        ["Quaternion"] = playerData.Rotation.ToString(),
+                        ["TowerQuaternion"] = playerData.TowerRotation.ToString(),
+                        ["CannonQuaternion"] = playerData.CannonRotation.ToString()
+                    }
+                }
+            };
+            SendMessageRequestEvent.Invoke(message);
+        }
+
 
         public void ProcessMessage(CommunicationMessage<Dictionary<string, string>> message)
         {

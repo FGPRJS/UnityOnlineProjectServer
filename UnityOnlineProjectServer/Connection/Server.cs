@@ -130,7 +130,7 @@ namespace UnityOnlineProjectServer.Connection
                         //CheckHeartbeat
                         client?.heartbeat?.CountTick(_tickInterval);
                         //CheckPositionReport
-                        client?.positionReport?.CountTick(_tickInterval);
+                        client?.player?.positionReport?.CountTick(_tickInterval);
                     }
                 }
             }), _globalServerTaskCancellationToken);

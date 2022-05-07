@@ -17,7 +17,6 @@ namespace UnityOnlineProjectServer.Connection
         internal Heartbeat heartbeat;
         
         internal Player player;
-        internal PositionReport positionReport;
 
         public readonly long id;
 
@@ -46,34 +45,10 @@ namespace UnityOnlineProjectServer.Connection
             player = new Player();
             player.SendMessageRequestEvent += SendMessageRequestEventAction;
 
-            //Position Report
-            positionReport = new PositionReport();
-            positionReport.TickEvent += PositionReportTickEventAction;
-
             BeginReceive();
         }
 
-        private void PositionReportTickEventAction()
-        {
-            var message = new CommunicationMessage<Dictionary<string, string>>()
-            {
-                header = new Header()
-                {
-                    MessageName = MessageType.TankPositionReport.ToString()
-                },
-                body = new Body<Dictionary<string, string>>()
-                {
-                    Any = new Dictionary<string, string>()
-                    {
-                        ["Position"] = player.playerData.Position.ToString(),
-                        ["Quaternion"] = player.playerData.Rotation.ToString(),
-                        ["TowerQuaternion"] = player.playerData.TowerRotation.ToString(),
-                        ["CannonQuaternion"] = player.playerData.CannonRotation.ToString()
-                    }
-                }
-            };
-            SendData(message);
-        }
+        
 
         #region Event Action
 
@@ -256,9 +231,6 @@ namespace UnityOnlineProjectServer.Connection
 
             player.SendMessageRequestEvent -= SendMessageRequestEventAction;
             player = null;
-
-            positionReport.TickEvent -= PositionReportTickEventAction;
-            positionReport = null;
 
             Frame.ResetDataFrame();
             Frame = null;
