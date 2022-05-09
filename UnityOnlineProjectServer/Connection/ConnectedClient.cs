@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using UnityOnlineProjectServer.Connection.TickTasking;
 using UnityOnlineProjectServer.Protocol;
 
 namespace UnityOnlineProjectServer.Connection
@@ -12,11 +13,11 @@ namespace UnityOnlineProjectServer.Connection
     public class ConnectedClient
     {
         public Socket ClientSocket;
-        public DataFrame Frame;
+        public DataFrame communicationData;
 
         public Heartbeat heartbeat;
         
-        public Tank player;
+        public Tank playerObject;
 
         public readonly long id;
 
@@ -31,7 +32,7 @@ namespace UnityOnlineProjectServer.Connection
 
         public void Initialize(Socket socket)
         {
-            Frame = new DataFrame();
+            communicationData = new DataFrame();
 
             this.ClientSocket = socket;
             socket.ReceiveBufferSize = DataFrame.BufferSize;
@@ -42,13 +43,11 @@ namespace UnityOnlineProjectServer.Connection
             heartbeat.TickEvent += HeartbeatTickEventAction;
 
             //Player
-            player = new Tank();
-            player.SendMessageRequestEvent += SendMessageRequestEventAction;
+            playerObject = new Tank();
+            playerObject.SendMessageRequestEvent += SendMessageRequestEventAction;
 
             BeginReceive();
         }
-
-        
 
         #region Event Action
 
@@ -74,7 +73,7 @@ namespace UnityOnlineProjectServer.Connection
             try
             {
                 ClientSocket?.BeginReceive(
-                Frame.buffer,
+                communicationData.buffer,
                 0,
                 DataFrame.BufferSize,
                 SocketFlags.None,
@@ -102,41 +101,41 @@ namespace UnityOnlineProjectServer.Connection
                 {
                     for (var i = 0; i < bytesRead; i++)
                     {
-                        switch (Frame.buffer[i])
+                        switch (communicationData.buffer[i])
                         {
                             case 0x01:
 
-                                if (!Frame.SOF)
+                                if (!communicationData.SOF)
                                 {
-                                    Frame.SOF = true;
+                                    communicationData.SOF = true;
                                 }
                                 //Already SOF exist => discard before data
                                 else
                                 {
-                                    Frame.ResetDataFrame();
+                                    communicationData.ResetDataFrame();
                                 }
 
                                 break;
 
                             case 0x02:
 
-                                if (Frame.SOF)
+                                if (communicationData.SOF)
                                 {
-                                    var completeData = Frame.GetByteData();
+                                    var completeData = communicationData.GetByteData();
                                     var receivedMessage = CommunicationUtility.Deserialize(completeData);
-                                    player.ProcessMessage(receivedMessage);
+                                    playerObject.ProcessMessage(receivedMessage);
                                 }
                                 //Incomplete Message. Discard
-                                Frame.ResetDataFrame();
+                                communicationData.ResetDataFrame();
 
 
                                 break;
 
                             default:
 
-                                if (Frame.SOF)
+                                if (communicationData.SOF)
                                 {
-                                    Frame.AddByte(Frame.buffer[i]);
+                                    communicationData.AddByte(communicationData.buffer[i]);
                                 }
 
                                 break;
@@ -229,11 +228,11 @@ namespace UnityOnlineProjectServer.Connection
             heartbeat.TickEvent -= HeartbeatTickEventAction;
             heartbeat = null;
 
-            player.SendMessageRequestEvent -= SendMessageRequestEventAction;
-            player = null;
+            playerObject.SendMessageRequestEvent -= SendMessageRequestEventAction;
+            playerObject = null;
 
-            Frame.ResetDataFrame();
-            Frame = null;
+            communicationData.ResetDataFrame();
+            communicationData = null;
 
             ClientSocket = null;
 

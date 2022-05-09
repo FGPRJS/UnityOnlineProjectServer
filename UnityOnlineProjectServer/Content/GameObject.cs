@@ -44,11 +44,13 @@ namespace UnityOnlineProjectServer.Content
 
         void TickEventAction(object sender, EventArgs arg)
         {
-            var somedata = CreateTickMessage();
+            var somedata = CreateCurrentStatusMessage();
             SendMessageRequestEvent?.Invoke(sender, somedata);
         }
 
-        protected abstract CommunicationMessage<Dictionary<string, string>> CreateTickMessage();
+        public abstract CommunicationMessage<Dictionary<string, string>> CreateCurrentStatusMessage();
+
+        protected abstract void ReceiveCurrentGameObjectStatus(CommunicationMessage<Dictionary<string, string>> message);
 
         protected void SendMessage(object sender, CommunicationMessage<Dictionary<string, string>> message)
         {

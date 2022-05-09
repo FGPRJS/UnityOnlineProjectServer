@@ -15,6 +15,9 @@ namespace UnityOnlineProjectServer.Content
         private int _xRegionCount;
         private int _zRegionCount;
 
+        private float _regionWidth;
+        private float _regionHeight;
+
         //Region "Nearby" standard
         private int _nearbyRegionLength;
         //Nearby Regions
@@ -30,8 +33,8 @@ namespace UnityOnlineProjectServer.Content
             _zRegionCount = zRegionCount;
             _nearbyRegionLength = nearbyRegionLength;
 
-            var xRegionLength = _x / _xRegionCount;
-            var zRegionLength = _z / _zRegionCount;
+            _regionWidth = _x / _xRegionCount;
+            _regionHeight = _z / _zRegionCount;
 
             nearbyRegions = new Dictionary<int, Region>();
 
@@ -41,7 +44,9 @@ namespace UnityOnlineProjectServer.Content
             {
                 for (int j = 0; j < _xRegionCount; j++)
                 {
-                    var newRegion = new Region(i * j + j, i * zRegionLength, j * zRegionLength, xRegionLength, xRegionLength);
+                    var newRegion = new Region(i * j + j, j * _regionWidth, i * _regionHeight, _regionWidth, _regionHeight);
+
+                    newRegion.GameObjectLostEvent += MoveGameObjectToAppropriateRegion;
 
                     regions[i, j] = newRegion;
                 }
@@ -54,23 +59,53 @@ namespace UnityOnlineProjectServer.Content
                 {
                     var targetRegion = regions[i,j];
 
-                    var nearbyLeftRegionIndex = Math.Max(0, i - _nearbyRegionLength);
-                    var nearbyRightRegionIndex = Math.Min(_xRegionCount, i + _nearbyRegionLength + 1);
-                    var nearbyTopRegionIndex = Math.Max(0, j - _nearbyRegionLength);
-                    var nearbyBottomRegionIndex = Math.Min(_zRegionCount, j + _nearbyRegionLength + 1);
+                    //x
+                    var xMin = Math.Max(0, i - _nearbyRegionLength);
+                    var xMax = Math.Min(_xRegionCount, i + _nearbyRegionLength + 1);
+                    //z
+                    var zMin = Math.Max(0, j - _nearbyRegionLength);
+                    var zMax = Math.Min(_zRegionCount, j + _nearbyRegionLength + 1);
 
-                    for (int ri = nearbyLeftRegionIndex; ri < nearbyRightRegionIndex; ri++)
+                    for (var zIndex = zMin; zIndex < zMax; zIndex++)
                     {
-                        for(int ti = nearbyTopRegionIndex; ti < nearbyBottomRegionIndex; ti++)
+                        for (var xIndex = xMin; xIndex < xMax; xIndex++)
                         {
-                            var nearbyRegion = regions[ri,ti];
+                            var nearbyRegion = regions[zIndex,xIndex];
                             //Do not add itself
-                            if ((i == ri) && (j == ti)) continue;
+                            if ((i == zIndex) && (j == xIndex)) continue;
 
                             targetRegion.AddNearbyRegion(nearbyRegion);
                         }
                     }
                 }
+            }
+        }
+        
+        public void AddObject(GameObject obj)
+        {
+            var region = GetAppropriateRegion(obj);
+
+            region?.AddGameObject(obj);
+        }
+
+        private void MoveGameObjectToAppropriateRegion(object sender, GameObject obj)
+        {
+            GetAppropriateRegion(obj).AddGameObject(obj);
+        }
+
+        public Region GetAppropriateRegion(GameObject obj)
+        {
+            int objXIndex = (int)(Math.Ceiling(obj.Position.X / _regionWidth));
+            int objZIndex = (int)(Math.Ceiling(obj.Position.Z / _regionHeight));
+
+            try
+            {
+                var result = regions[objZIndex, objXIndex];
+                return result;
+            }
+            catch (IndexOutOfRangeException)
+            {
+                return null;
             }
         }
     }

@@ -11,6 +11,5 @@ namespace UnityOnlineProjectServer.Connection
             _interval = 3000;
             _maxCount = 0;
         }
-
     }
 }

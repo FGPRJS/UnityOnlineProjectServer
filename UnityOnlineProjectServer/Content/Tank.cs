@@ -25,7 +25,7 @@ namespace UnityOnlineProjectServer.Connection
             
         }
 
-        protected override CommunicationMessage<Dictionary<string, string>> CreateTickMessage()
+        public override CommunicationMessage<Dictionary<string, string>> CreateCurrentStatusMessage()
         {
             var TickMessage = new CommunicationMessage<Dictionary<string, string>>()
             {
@@ -111,25 +111,30 @@ namespace UnityOnlineProjectServer.Connection
 
                 case MessageType.TankPositionReport:
 
-                    var rawPositionData = message.body.Any["Position"];
-                    var readedPositionData = NumericParser.ParseVector(rawPositionData);
-
-                    var rawRotationData = message.body.Any["Quaternion"];
-                    var readedRotationData = NumericParser.ParseQuaternion(rawRotationData);
-
-                    var rawTowerRotationData = message.body.Any["TowerQuaternion"];
-                    var readedTowerRotationData = NumericParser.ParseQuaternion(rawTowerRotationData);
-
-                    var rawCannonRotationData = message.body.Any["CannonQuaternion"];
-                    var readedCannonRotationData = NumericParser.ParseQuaternion(rawCannonRotationData);
-
-                    Rotation = readedRotationData;
-                    Position = readedPositionData;
-                    TowerRotation = readedTowerRotationData;
-                    CannonRotation = readedCannonRotationData;
+                    ReceiveCurrentGameObjectStatus(message);
 
                     break;
             }
+        }
+
+        protected override void ReceiveCurrentGameObjectStatus(CommunicationMessage<Dictionary<string, string>> message)
+        {
+            var rawPositionData = message.body.Any["Position"];
+            var readedPositionData = NumericParser.ParseVector(rawPositionData);
+
+            var rawRotationData = message.body.Any["Quaternion"];
+            var readedRotationData = NumericParser.ParseQuaternion(rawRotationData);
+
+            var rawTowerRotationData = message.body.Any["TowerQuaternion"];
+            var readedTowerRotationData = NumericParser.ParseQuaternion(rawTowerRotationData);
+
+            var rawCannonRotationData = message.body.Any["CannonQuaternion"];
+            var readedCannonRotationData = NumericParser.ParseQuaternion(rawCannonRotationData);
+
+            Rotation = readedRotationData;
+            Position = readedPositionData;
+            TowerRotation = readedTowerRotationData;
+            CannonRotation = readedCannonRotationData;
         }
 
         void SendNACKMessage(CommunicationMessage<Dictionary<string,string>> replyMessage, string reason)

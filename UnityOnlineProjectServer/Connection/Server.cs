@@ -3,18 +3,24 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
+using System.Numerics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using UnityOnlineProjectServer.Connection.TickTasking;
+using UnityOnlineProjectServer.Content;
 
 namespace UnityOnlineProjectServer.Connection
 {
     public class Server
     {
+        public FieldMap Map;
+        public NearbyObjPositionReport posReport;
+
         public bool isRun;
         public Socket socket;
 
-        private long clientCount = 1;
+        private long clientCount = 100;
         private ConcurrentDictionary<long, ConnectedClient> clients;
 
         private int pendingConnectionQueueCount = 100;
@@ -22,6 +28,13 @@ namespace UnityOnlineProjectServer.Connection
 
         public Server()
         {
+            //Create Map
+            Map = new FieldMap(1000, 1000, 10, 10, 1);
+
+            //Create PositionReport
+            posReport = new NearbyObjPositionReport();
+            posReport.TickEvent += ReportObjectPosition;
+
             // Create Socket
             socket = new Socket(
                 AddressFamily.InterNetwork, 
@@ -97,6 +110,8 @@ namespace UnityOnlineProjectServer.Connection
             Console.WriteLine("Client Connected");
         }
 
+        #region Tick Task
+
         #region Global Tick Task
 
         private CancellationTokenSource _globalServerTaskCancellationTokenSource;
@@ -123,6 +138,7 @@ namespace UnityOnlineProjectServer.Connection
                     await Task.Delay(_tickInterval);
 
                     //Tick Action
+                    posReport.CountTick(_tickInterval);
                     
                     for (long i = 0; i < clientCount; i++)
                     {
@@ -130,7 +146,8 @@ namespace UnityOnlineProjectServer.Connection
                         //CheckHeartbeat
                         client?.heartbeat?.CountTick(_tickInterval);
                         //CheckPositionReport
-                        client?.player?.positionReport?.CountTick(_tickInterval);
+                        client?.playerObject?.positionReport?.CountTick(_tickInterval);
+                        //
                     }
                 }
             }), _globalServerTaskCancellationToken);
@@ -153,7 +170,27 @@ namespace UnityOnlineProjectServer.Connection
             }
         }
 
-        #endregion
+        #endregion // Global Tick Task
+
+        private void ReportObjectPosition(object sender, EventArgs e)
+        {
+            for (long i = 0; i < clientCount; i++)
+            {
+                var client = clients[i];
+                var clientObj = client?.playerObject;
+
+                if (clientObj == null) continue;
+                var region = Map.GetAppropriateRegion(clientObj);
+                var nearbyObjs = region.GetAllNearbyGameObjects();
+                foreach(var obj in nearbyObjs)
+                {
+                    var message = obj.CreateCurrentStatusMessage();
+                    client.SendData(message);
+                }
+            }
+        }
+
+        #endregion // TickTask
 
         #region ShutDown
         public void ShutDownClient(long id)
