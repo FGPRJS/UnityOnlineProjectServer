@@ -4,9 +4,9 @@ using System.Text;
 
 namespace UnityOnlineProjectServer.Connection
 {
-    internal class PositionReport : TickTask
+    public class PositionReport : TickTask
     {
-        internal PositionReport()
+        public PositionReport()
         {
             _interval = 3000;
             _maxCount = 0;

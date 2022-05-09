@@ -9,27 +9,27 @@ using UnityOnlineProjectServer.Protocol;
 
 namespace UnityOnlineProjectServer.Connection
 {
-    internal class ConnectedClient
+    public class ConnectedClient
     {
-        internal Socket ClientSocket;
-        internal DataFrame Frame;
+        public Socket ClientSocket;
+        public DataFrame Frame;
 
-        internal Heartbeat heartbeat;
+        public Heartbeat heartbeat;
         
-        internal Player player;
+        public Tank player;
 
         public readonly long id;
 
-        internal event ShutdownRequest ShutdownRequestEvent;
-        internal delegate void ShutdownRequest(long id);
+        public event ShutdownRequest ShutdownRequestEvent;
+        public delegate void ShutdownRequest(long id);
 
 
-        internal ConnectedClient(long id)
+        public ConnectedClient(long id)
         {
             this.id = id;
         }
 
-        internal void Initialize(Socket socket)
+        public void Initialize(Socket socket)
         {
             Frame = new DataFrame();
 
@@ -42,7 +42,7 @@ namespace UnityOnlineProjectServer.Connection
             heartbeat.TickEvent += HeartbeatTickEventAction;
 
             //Player
-            player = new Player();
+            player = new Tank();
             player.SendMessageRequestEvent += SendMessageRequestEventAction;
 
             BeginReceive();
@@ -52,17 +52,17 @@ namespace UnityOnlineProjectServer.Connection
 
         #region Event Action
 
-        void HeartbeatTimeOutEventAction()
+        void HeartbeatTimeOutEventAction(object sender, EventArgs arg)
         {
             ShutDownRequest();
         }
 
-        void HeartbeatTickEventAction()
+        void HeartbeatTickEventAction(object sender, EventArgs arg)
         {
             SendData(Heartbeat.heartbeatMessageByteData);
         }
 
-        void SendMessageRequestEventAction(CommunicationMessage<Dictionary<string, string>> message) 
+        void SendMessageRequestEventAction(object sender, CommunicationMessage<Dictionary<string, string>> message) 
         {
             SendData(message);
         }
@@ -163,7 +163,7 @@ namespace UnityOnlineProjectServer.Connection
         }
 
         #region Send Data
-        internal void SendData(CommunicationMessage<Dictionary<string,string>> message)
+        public void SendData(CommunicationMessage<Dictionary<string,string>> message)
         {
             try
             {
@@ -177,7 +177,7 @@ namespace UnityOnlineProjectServer.Connection
             }
         }
 
-        internal void SendData(byte[] byteData)
+        public void SendData(byte[] byteData)
         {
             try
             {
@@ -222,7 +222,7 @@ namespace UnityOnlineProjectServer.Connection
         }
         #endregion
 
-        internal void ShutDownRequest()
+        public void ShutDownRequest()
         {
             //Clear Event
             heartbeat.TimeoutEvent -= HeartbeatTimeOutEventAction;

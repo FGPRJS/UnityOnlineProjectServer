@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 
 namespace UnityOnlineProjectServer.Utility
 {
-    internal class NumericParser
+    public class NumericParser
     {
         public static Vector3 ParseVector(string stringVector)
         {

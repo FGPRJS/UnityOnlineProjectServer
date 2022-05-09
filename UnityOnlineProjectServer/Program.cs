@@ -7,7 +7,7 @@ using UnityOnlineProjectServer.Utility;
 
 namespace UnityOnlineProjectServer
 {
-    internal class Program
+    public class Program
     {
         static void Main(string[] args)
         {

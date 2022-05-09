@@ -4,7 +4,7 @@ using System.Text;
 
 namespace UnityOnlineProjectServer.Content
 {
-    internal class RandomManager
+    public class RandomManager
     {
         private static RandomManager instance;
         public static RandomManager Instance

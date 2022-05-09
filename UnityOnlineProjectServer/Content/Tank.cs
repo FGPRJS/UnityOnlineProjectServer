@@ -10,33 +10,24 @@ using UnityOnlineProjectServer.Utility;
 
 namespace UnityOnlineProjectServer.Connection
 {
-    internal class Player
+    public class Tank : GameObject
     {
-        public TankData playerData;
-        public static Dictionary<string, Player> PlayerMap = new Dictionary<string, Player>();
+        public Quaternion TowerRotation;
+        public Quaternion CannonRotation;
 
-        internal PositionReport positionReport;
-
-        public delegate void SendMessageRequest(CommunicationMessage<Dictionary<string, string>> message);
-        public event SendMessageRequest SendMessageRequestEvent;
-
-        public Player()
+        public Tank() : base()
         {
-            //Position Report
-            positionReport = new PositionReport();
-            positionReport.TickEvent += PositionReportTickEventAction;
+            
         }
 
-        ~Player()
+        ~Tank()
         {
-            positionReport.TickEvent -= PositionReportTickEventAction;
+            
         }
 
-        private void PositionReportTickEventAction()
+        protected override CommunicationMessage<Dictionary<string, string>> CreateTickMessage()
         {
-            if (playerData == null) return;
-
-            var message = new CommunicationMessage<Dictionary<string, string>>()
+            var TickMessage = new CommunicationMessage<Dictionary<string, string>>()
             {
                 header = new Header()
                 {
@@ -46,16 +37,16 @@ namespace UnityOnlineProjectServer.Connection
                 {
                     Any = new Dictionary<string, string>()
                     {
-                        ["Position"] = playerData.Position.ToString(),
-                        ["Quaternion"] = playerData.Rotation.ToString(),
-                        ["TowerQuaternion"] = playerData.TowerRotation.ToString(),
-                        ["CannonQuaternion"] = playerData.CannonRotation.ToString()
+                        ["Position"] = Position.ToString(),
+                        ["Quaternion"] = Rotation.ToString(),
+                        ["TowerQuaternion"] = TowerRotation.ToString(),
+                        ["CannonQuaternion"] = CannonRotation.ToString()
                     }
                 }
             };
-            SendMessageRequestEvent.Invoke(message);
-        }
 
+            return TickMessage;
+        }
 
         public void ProcessMessage(CommunicationMessage<Dictionary<string, string>> message)
         {
@@ -83,17 +74,10 @@ namespace UnityOnlineProjectServer.Connection
                 
                 case MessageType.LoginRequest:
 
-                    //Duplicate Name
-                    if (PlayerMap.ContainsKey(message.header.MessageName))
-                    {
-                        SendNACKMessage(message, "Already exist user that has same name.");
-                        return;
-                    }
-
-                    playerData = new TankData(message.body.Any["UserName"]);
+                    GameObjectName = message.body.Any["UserName"];
                     message.header.ACK = (int)ACK.ACK;
                     
-                    SendMessageRequestEvent.Invoke(message);
+                    SendMessage(this, message);
 
                     break;
 
@@ -139,10 +123,10 @@ namespace UnityOnlineProjectServer.Connection
                     var rawCannonRotationData = message.body.Any["CannonQuaternion"];
                     var readedCannonRotationData = NumericParser.ParseQuaternion(rawCannonRotationData);
 
-                    playerData.Rotation = readedRotationData;
-                    playerData.Position = readedPositionData;
-                    playerData.TowerRotation = readedTowerRotationData;
-                    playerData.CannonRotation = readedCannonRotationData;
+                    Rotation = readedRotationData;
+                    Position = readedPositionData;
+                    TowerRotation = readedTowerRotationData;
+                    CannonRotation = readedCannonRotationData;
 
                     break;
             }
@@ -152,13 +136,13 @@ namespace UnityOnlineProjectServer.Connection
         {
             replyMessage.header.ACK = (int)ACK.NACK;
             replyMessage.header.Reason = reason;
-            SendMessageRequestEvent?.Invoke(replyMessage);
+            SendMessage(this, replyMessage);
         }
 
         void SendACKMessage(CommunicationMessage<Dictionary<string, string>> replyMessage)
         {
             replyMessage.header.ACK = (int)ACK.ACK;
-            SendMessageRequestEvent?.Invoke(replyMessage);
+            SendMessage(this, replyMessage);
         }
     }
 }

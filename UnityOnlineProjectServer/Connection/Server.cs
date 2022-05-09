@@ -9,18 +9,18 @@ using System.Threading.Tasks;
 
 namespace UnityOnlineProjectServer.Connection
 {
-    internal class Server
+    public class Server
     {
-        internal bool isRun;
-        internal Socket socket;
+        public bool isRun;
+        public Socket socket;
 
         private long clientCount = 1;
         private ConcurrentDictionary<long, ConnectedClient> clients;
 
         private int pendingConnectionQueueCount = 100;
-        internal int Port = 8080;
+        public int Port = 8080;
 
-        internal Server()
+        public Server()
         {
             // Create Socket
             socket = new Socket(
@@ -39,7 +39,7 @@ namespace UnityOnlineProjectServer.Connection
             }
         }
 
-        internal void Start()
+        public void Start()
         {
             Console.WriteLine("Server Start");
 
@@ -50,7 +50,7 @@ namespace UnityOnlineProjectServer.Connection
             OpenServer(endPoint);
         }
 
-        internal void StartLocal()
+        public void StartLocal()
         {
             Console.WriteLine("Server Start");
 
@@ -156,7 +156,7 @@ namespace UnityOnlineProjectServer.Connection
         #endregion
 
         #region ShutDown
-        internal void ShutDownClient(long id)
+        public void ShutDownClient(long id)
         {
             var client = clients[id];
 
@@ -168,7 +168,7 @@ namespace UnityOnlineProjectServer.Connection
             }
         }
 
-        internal void ShutDownAllClients()
+        public void ShutDownAllClients()
         {
             Console.WriteLine("ShutDown clients...");
 
@@ -181,7 +181,7 @@ namespace UnityOnlineProjectServer.Connection
             Console.WriteLine("ShutDown clients complete!");
         }
 
-        internal void ShutDownServer()
+        public void ShutDownServer()
         {
             Console.WriteLine("Shutdown server...");
 

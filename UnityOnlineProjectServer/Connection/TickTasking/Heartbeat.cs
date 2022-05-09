@@ -6,13 +6,13 @@ using UnityOnlineProjectServer.Protocol;
 
 namespace UnityOnlineProjectServer.Connection
 {
-    internal class Heartbeat : TickTask
+    public class Heartbeat : TickTask
     {
-        internal static CommunicationMessage<Dictionary<string, string>> heartbeatMessage;
-        internal static byte[] heartbeatMessageByteData;
+        public static CommunicationMessage<Dictionary<string, string>> heartbeatMessage;
+        public static byte[] heartbeatMessageByteData;
 
 
-        internal Heartbeat()
+        public Heartbeat()
         {
             _interval = 5000;
             _maxCount = 4;

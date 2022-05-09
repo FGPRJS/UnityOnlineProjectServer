@@ -5,7 +5,7 @@ using System.Text;
 
 namespace UnityOnlineProjectServer.Protocol
 {
-    internal class CommunicationUtility
+    public class CommunicationUtility
     {
         public static void Decoding(byte[] receivedData)
         {

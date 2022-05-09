@@ -9,4 +9,12 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EditorConfigFiles Remove="E:\PROJECT\UnityProject\PROJECT\UnityOnlineProjectServer\UnityOnlineProjectServer\.editorconfig" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="E:\PROJECT\UnityProject\PROJECT\UnityOnlineProjectServer\UnityOnlineProjectServer\.editorconfig" />
+  </ItemGroup>
+
 </Project>

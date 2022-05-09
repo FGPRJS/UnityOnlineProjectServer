@@ -4,34 +4,34 @@ using System.Text;
 
 namespace UnityOnlineProjectServer.Connection
 {
-    internal class DataFrame
+    public class DataFrame
     {
         public static int BufferSize = 4096;
         public byte[] buffer = new byte[BufferSize];
 
-        internal bool SOF = false;
+        public bool SOF = false;
         private Queue<byte> _dataQueue = new Queue<byte>();
-        internal string GetStringData()
+        public string GetStringData()
         {
             var arr = GetByteData();
             var str = Encoding.ASCII.GetString(arr);
             return str;
         }
 
-        internal byte[] GetByteData()
+        public byte[] GetByteData()
         {
             return _dataQueue.ToArray();
         }
-        internal void AddByte(byte b)
+        public void AddByte(byte b)
         {
             _dataQueue.Enqueue(b);
         }
-        internal void FlushDataQueue()
+        public void FlushDataQueue()
         {
             _dataQueue.Clear();
         }
 
-        internal void ResetDataFrame()
+        public void ResetDataFrame()
         {
             FlushDataQueue();
             SOF = false;

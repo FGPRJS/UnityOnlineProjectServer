@@ -4,7 +4,7 @@ using System.Text;
 
 namespace UnityOnlineProjectServer.Connection
 {
-    internal abstract class TickTask
+    public abstract class TickTask
     {
         protected int _interval;
         protected int _maxCount;
@@ -12,11 +12,8 @@ namespace UnityOnlineProjectServer.Connection
         private int _currentElapsed = 0;
         private int _currentCount = 0;
 
-        internal delegate void Tick();
-        internal event Tick TickEvent; 
-        
-        internal delegate void Timeout();
-        internal event Timeout TimeoutEvent;
+        public EventHandler TickEvent; 
+        public EventHandler TimeoutEvent;
 
 
         public void CountTick(int interval)
@@ -26,14 +23,14 @@ namespace UnityOnlineProjectServer.Connection
             if (_currentElapsed >= _interval)
             {
                 _currentElapsed = 0;
-                TickEvent?.Invoke();
+                TickEvent?.Invoke(this,null);
                 _currentCount++;
             }
 
             if (_hasTimeout && (_currentCount >= _maxCount))
             {
                 _currentCount = 0;
-                TimeoutEvent?.Invoke();
+                TimeoutEvent?.Invoke(this, null);
             }
         }
 
