@@ -3,6 +3,7 @@
 using System;
 using System.Numerics;
 using UnityOnlineProjectServer.Connection;
+using UnityOnlineProjectServer.Content.Map;
 using UnityOnlineProjectServer.Utility;
 
 namespace UnityOnlineProjectServer
@@ -12,6 +13,7 @@ namespace UnityOnlineProjectServer
         static void Main(string[] args)
         {
             var isRun = true;
+
             Server server = new Server();
 
             Console.WriteLine("Server turned on");

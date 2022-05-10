@@ -9,9 +9,9 @@ namespace UnityOnlineProjectServer.Protocol
         LoginRequest,
         HeartBeatRequest,
         TankSpawnRequest,
-        TankSpawnSpawnReport,
-        GameObjectDestroyRequest,
-        TankPositionReport,
+        GameObjectSpawnReport,
+        GameObjectDestroyReport,
+        GameObjectPositionReport,
         GameObjectActionRequest,
         PlayerChatReport
     }

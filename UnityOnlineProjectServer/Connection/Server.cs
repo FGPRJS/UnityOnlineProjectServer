@@ -9,32 +9,26 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnityOnlineProjectServer.Connection.TickTasking;
 using UnityOnlineProjectServer.Content;
+using UnityOnlineProjectServer.Content.Map;
 
 namespace UnityOnlineProjectServer.Connection
 {
     public class Server
     {
-        public FieldMap Map;
-        public NearbyObjPositionReport posReport;
-
         public bool isRun;
         public Socket socket;
 
-        private long clientCount = 100;
+        private readonly long clientCount = 100;
         private ConcurrentDictionary<long, ConnectedClient> clients;
+
+        private readonly long gameFieldCount = 1;
+        private ConcurrentDictionary<long, GameField> gameFields;
 
         private int pendingConnectionQueueCount = 100;
         public int Port = 8080;
 
         public Server()
         {
-            //Create Map
-            Map = new FieldMap(1000, 1000, 10, 10, 1);
-
-            //Create PositionReport
-            posReport = new NearbyObjPositionReport();
-            posReport.TickEvent += ReportObjectPosition;
-
             // Create Socket
             socket = new Socket(
                 AddressFamily.InterNetwork, 
@@ -49,6 +43,16 @@ namespace UnityOnlineProjectServer.Connection
                 var client = new ConnectedClient(i);
                 client.ShutdownRequestEvent += (id) => { ShutDownClient(id); };
                 clients.TryAdd(i, client);
+            }
+
+            //Create Maps
+            gameFields = new ConcurrentDictionary<long, GameField>();
+            
+            for(long i = 0; i < gameFieldCount; i++)
+            {
+                var map = new GameField();
+                map.isEnterable = true;
+                gameFields.TryAdd(i, map);
             }
         }
 
@@ -98,16 +102,33 @@ namespace UnityOnlineProjectServer.Connection
             // Wait for other Client
             socket.BeginAccept(ClientAccepted, socket);
 
+            GameField availableField = null;
+
+            //Find Map
+            for (long mapIndex = 0; mapIndex < gameFields.Count; mapIndex++)
+            {
+                var map = gameFields[mapIndex];
+
+                if (map.isEnterable)
+                {
+                    availableField = map;
+                    break;
+                }
+            }
+
+            //Find Client
             for (long i = 0; i < clients.Count; i++)
             {
                 if(clients[i].ClientSocket == null)
                 {
                     clients[i].Initialize(handler);
+                    clients[i].currentField = availableField;
+                    Console.WriteLine("Client Connected");
+                    return;
                 }
             }
-            
 
-            Console.WriteLine("Client Connected");
+            //Client Full. Cannot Connect
         }
 
         #region Tick Task
@@ -136,9 +157,6 @@ namespace UnityOnlineProjectServer.Connection
                 while (isRun)
                 {
                     await Task.Delay(_tickInterval);
-
-                    //Tick Action
-                    posReport.CountTick(_tickInterval);
                     
                     for (long i = 0; i < clientCount; i++)
                     {
@@ -147,7 +165,6 @@ namespace UnityOnlineProjectServer.Connection
                         client?.heartbeat?.CountTick(_tickInterval);
                         //CheckPositionReport
                         client?.playerObject?.positionReport?.CountTick(_tickInterval);
-                        //
                     }
                 }
             }), _globalServerTaskCancellationToken);
@@ -172,24 +189,7 @@ namespace UnityOnlineProjectServer.Connection
 
         #endregion // Global Tick Task
 
-        private void ReportObjectPosition(object sender, EventArgs e)
-        {
-            for (long i = 0; i < clientCount; i++)
-            {
-                var client = clients[i];
-                var clientObj = client?.playerObject;
-
-                if (clientObj == null) continue;
-                var region = Map.GetAppropriateRegion(clientObj);
-                var nearbyObjs = region.GetAllNearbyGameObjects();
-                foreach(var obj in nearbyObjs)
-                {
-                    var message = obj.CreateCurrentStatusMessage();
-                    client.SendData(message);
-                }
-            }
-        }
-
+        
         #endregion // TickTask
 
         #region ShutDown

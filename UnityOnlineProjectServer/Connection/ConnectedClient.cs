@@ -1,23 +1,32 @@
 ﻿using Newtonsoft.Json;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net.Sockets;
+using System.Numerics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityOnlineProjectServer.Connection.TickTasking;
+using UnityOnlineProjectServer.Content;
+using UnityOnlineProjectServer.Content.Map;
 using UnityOnlineProjectServer.Protocol;
 
 namespace UnityOnlineProjectServer.Connection
 {
     public class ConnectedClient
     {
+        public GameField currentField;
+
         public Socket ClientSocket;
         public DataFrame communicationData;
 
+        public string clientName;
+
         public Heartbeat heartbeat;
-        
-        public Tank playerObject;
+        public NearbyObjPositionReport nearbyObjPositionReport;
+
+        public GameObject playerObject;
 
         public readonly long id;
 
@@ -42,9 +51,9 @@ namespace UnityOnlineProjectServer.Connection
             heartbeat.TimeoutEvent += HeartbeatTimeOutEventAction;
             heartbeat.TickEvent += HeartbeatTickEventAction;
 
-            //Player
-            playerObject = new Tank();
-            playerObject.SendMessageRequestEvent += SendMessageRequestEventAction;
+            //NearbyObjPositionReport
+            nearbyObjPositionReport = new NearbyObjPositionReport();
+            nearbyObjPositionReport.TickEvent += ReportNearbyObjPosition;
 
             BeginReceive();
         }
@@ -59,6 +68,17 @@ namespace UnityOnlineProjectServer.Connection
         void HeartbeatTickEventAction(object sender, EventArgs arg)
         {
             SendData(Heartbeat.heartbeatMessageByteData);
+        }
+
+        void ReportNearbyObjPosition(object sender, EventArgs e)
+        {
+            if (playerObject == null) return;
+
+            foreach (var obj in playerObject.GetNearbyObjects())
+            {
+                var message = obj.CreateCurrentStatusMessage(MessageType.GameObjectPositionReport);
+                SendData(message);
+            }
         }
 
         void SendMessageRequestEventAction(object sender, CommunicationMessage<Dictionary<string, string>> message) 
@@ -97,51 +117,7 @@ namespace UnityOnlineProjectServer.Connection
             {
                 int bytesRead = ClientSocket.EndReceive(ar);
 
-                if(bytesRead > 0)
-                {
-                    for (var i = 0; i < bytesRead; i++)
-                    {
-                        switch (communicationData.buffer[i])
-                        {
-                            case 0x01:
-
-                                if (!communicationData.SOF)
-                                {
-                                    communicationData.SOF = true;
-                                }
-                                //Already SOF exist => discard before data
-                                else
-                                {
-                                    communicationData.ResetDataFrame();
-                                }
-
-                                break;
-
-                            case 0x02:
-
-                                if (communicationData.SOF)
-                                {
-                                    var completeData = communicationData.GetByteData();
-                                    var receivedMessage = CommunicationUtility.Deserialize(completeData);
-                                    playerObject.ProcessMessage(receivedMessage);
-                                }
-                                //Incomplete Message. Discard
-                                communicationData.ResetDataFrame();
-
-
-                                break;
-
-                            default:
-
-                                if (communicationData.SOF)
-                                {
-                                    communicationData.AddByte(communicationData.buffer[i]);
-                                }
-
-                                break;
-                        }
-                    }
-                }
+                ProcessDataFrame(bytesRead);
 
                 heartbeat.ResetTimer();
                 BeginReceive();
@@ -160,6 +136,150 @@ namespace UnityOnlineProjectServer.Connection
                 ShutDownRequest();
             }
         }
+
+        #region Process Received Data Frame
+
+        private void ProcessDataFrame(int bytesRead)
+        {
+            if (bytesRead > 0)
+            {
+                for (var i = 0; i < bytesRead; i++)
+                {
+                    switch (communicationData.buffer[i])
+                    {
+                        case 0x01:
+
+                            if (!communicationData.SOF)
+                            {
+                                communicationData.SOF = true;
+                            }
+                            //Already SOF exist => discard before data
+                            else
+                            {
+                                communicationData.ResetDataFrame();
+                            }
+
+                            break;
+
+                        case 0x02:
+
+                            //Completed Message. Process
+                            if (communicationData.SOF)
+                            {
+                                var completeData = communicationData.GetByteData();
+                                var receivedMessage = CommunicationUtility.Deserialize(completeData);
+                                ProcessMessage(receivedMessage);
+                            }
+                            //Incomplete Message. Discard
+                            communicationData.ResetDataFrame();
+
+
+                            break;
+
+                        default:
+
+                            if (communicationData.SOF)
+                            {
+                                communicationData.AddByte(communicationData.buffer[i]);
+                            }
+
+                            break;
+                    }
+                }
+            }
+        }
+
+
+        private void ProcessMessage(CommunicationMessage<Dictionary<string, string>> message)
+        {
+            MessageType messageType;
+
+            try
+            {
+                messageType = (MessageType)Enum.Parse(typeof(MessageType), message.header.MessageName);
+            }
+            catch
+            {
+                Console.WriteLine("MessageType crashed. Cannot process message");
+                return;
+            }
+
+            switch (messageType)
+            {
+                case MessageType.HeartBeatRequest:
+
+                    if (message.header.ACK == (int)ACK.ACK) return;
+
+                    //Just Reply
+                    SendACKMessage(message);
+                    break;
+
+                case MessageType.LoginRequest:
+
+                    clientName = message.body.Any["UserName"];
+                    message.header.ACK = (int)ACK.ACK;
+
+                    SendData(message);
+
+                    break;
+
+                case MessageType.TankSpawnRequest:
+
+                    var random = RandomManager.Instance.random;
+
+                    Vector3 position = new Vector3(
+                        random.Next(100, 800),
+                        20,
+                        random.Next(100, 800));
+
+                    Quaternion rotation = Quaternion.CreateFromYawPitchRoll(
+                        0,
+                        random.Next(-180, 180),
+                        0);
+
+                    //Create Object
+                    playerObject = currentField.CreateGameObject(GameObject.GameObjectType.Tank, position);
+                    playerObject.Rotation = rotation;
+
+                    message.body = new Body<Dictionary<string, string>>()
+                    {
+                        Any = new Dictionary<string, string>()
+                        {
+                            ["Type"] = random.Next(0, 4).ToString(),
+                            ["Position"] = position.ToString(),
+                            ["Quaternion"] = rotation.ToString()
+                        }
+                    };
+
+                    SendACKMessage(message);
+
+                    break;
+
+                case MessageType.GameObjectPositionReport:
+
+                    playerObject.ApplyCurrentStatusMessage(message);
+
+                    break;
+            }
+        }
+        #endregion
+
+        #region Reply Message
+
+        void SendNACKMessage(CommunicationMessage<Dictionary<string, string>> replyMessage, string reason)
+        {
+            replyMessage.header.ACK = (int)ACK.NACK;
+            replyMessage.header.Reason = reason;
+            SendData(replyMessage);
+        }
+
+        void SendACKMessage(CommunicationMessage<Dictionary<string, string>> replyMessage)
+        {
+            replyMessage.header.ACK = (int)ACK.ACK;
+            SendData(replyMessage);
+        }
+
+        #endregion
 
         #region Send Data
         public void SendData(CommunicationMessage<Dictionary<string,string>> message)

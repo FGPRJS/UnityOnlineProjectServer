@@ -18,5 +18,15 @@ namespace UnityOnlineProjectServer.Content
         }
 
         public Random random = new Random();
+
+        public static float GetRandomWithfloatingPoint(int min, int max)
+        {
+            var intval = Instance.random.Next(min, max);
+            var decimalval = Instance.random.NextDouble();
+
+            float result = (float)(intval + decimalval);
+
+            return result;
+        }
     }
 }
