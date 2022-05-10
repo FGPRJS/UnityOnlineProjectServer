@@ -28,5 +28,10 @@ namespace UnityOnlineProjectServer.Content
 
             return result;
         }
+
+        public static int GetIntegerRandom(int min, int max)
+        {
+            return Instance.random.Next(min, max);
+        }
     }
 }
