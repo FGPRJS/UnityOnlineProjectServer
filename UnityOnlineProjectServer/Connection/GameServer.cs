@@ -13,7 +13,7 @@ using UnityOnlineProjectServer.Content.Map;
 
 namespace UnityOnlineProjectServer.Connection
 {
-    public class Server
+    public class GameServer
     {
         public bool isRun;
         public Socket socket;
@@ -27,7 +27,7 @@ namespace UnityOnlineProjectServer.Connection
         private int pendingConnectionQueueCount = 100;
         public int Port = 8080;
 
-        public Server()
+        public GameServer()
         {
             // Create Socket
             socket = new Socket(

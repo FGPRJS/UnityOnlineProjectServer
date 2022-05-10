@@ -78,6 +78,7 @@ namespace UnityOnlineProjectServer.Content
         ~Pawn()
         {
             positionReport.TickEvent -= TickEventAction;
+            PositionChangedEvent -= CurrentPositionChangedEvent;
         }
 
         void TickEventAction(object sender, EventArgs arg)

@@ -119,18 +119,28 @@ namespace UnityOnlineProjectServer.Connection
             {
                 int bytesRead = ClientSocket.EndReceive(ar);
 
-                ProcessDataFrame(bytesRead);
+                if(bytesRead > 0)
+                {
+                    ProcessDataFrame(bytesRead);
 
-                heartbeat.ResetTimer();
-                BeginReceive();
+                    heartbeat.ResetTimer();
+                    BeginReceive();
+                }
+                else
+                {
+                    Console.WriteLine("Client Closed.");
+                    ShutDownRequest();
+                }
             }
             catch (NullReferenceException)
             {
                 Console.WriteLine("ClientSocket Lost");
+                ShutDownRequest();
             }
             catch (ObjectDisposedException)
             {
                 Console.WriteLine("ClientSocket is Disposed");
+                ShutDownRequest();
             }
             catch (SocketException)
             {
@@ -366,10 +376,11 @@ namespace UnityOnlineProjectServer.Connection
             heartbeat.TickEvent -= HeartbeatTickEventAction;
             heartbeat = null;
 
-            //Remove Controlling object
-            playerObject.SendMessageRequestEvent -= SendMessageRequestEventAction;
             if (playerObject != null)
             {
+                //Remove Controlling object
+                playerObject.SendMessageRequestEvent -= SendMessageRequestEventAction;
+
                 currentField.RemovePawn(playerObject);
                 playerObject = null;
             }
