@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using System.Text;
 using UnityOnlineProjectServer.Connection;
-using UnityOnlineProjectServer.Content.Gameobject.Implements;
+using UnityOnlineProjectServer.Content.GameObject.Implements;
 using UnityOnlineProjectServer.Utility;
 
 namespace UnityOnlineProjectServer.Content.Map
@@ -14,39 +14,39 @@ namespace UnityOnlineProjectServer.Content.Map
         public long MapID;
         public bool isEnterable = true;
 
-        public ConcurrentDictionary<GameObject, byte> detectors;
-        public ConcurrentDictionary<GameObject, byte> nonDetectors;
+        public ConcurrentDictionary<Pawn, byte> detectors;
+        public ConcurrentDictionary<Pawn, byte> nonDetectors;
 
-        public long CurrentGameObjectID = 1;
+        public long CurrentPawnID = 1;
 
         public GameField()
         {
-            detectors = new ConcurrentDictionary<GameObject, byte>();
-            nonDetectors = new ConcurrentDictionary<GameObject, byte>();
+            detectors = new ConcurrentDictionary<Pawn, byte>();
+            nonDetectors = new ConcurrentDictionary<Pawn, byte>();
         }
 
-        public GameObject CreateGameObject(GameObject.GameObjectType type, Vector3 position)
+        public Pawn CreatePawn(Pawn.PawnType type, Vector3 position)
         {
-            GameObject newObject = null;
+            Pawn newObject = null;
 
             switch (type)
             {
-                case GameObject.GameObjectType.Tank:
+                case Pawn.PawnType.Tank:
 
-                    newObject = new Tank(CurrentGameObjectID++);
+                    newObject = new Tank(CurrentPawnID++);
                     newObject.Position = position;
 
                     break;
 
-                case GameObject.GameObjectType.Dummy:
+                case Pawn.PawnType.Dummy:
 
-                    newObject = new Dummy(CurrentGameObjectID++);
+                    newObject = new Dummy(CurrentPawnID++);
                     newObject.Position = position;
 
                     break;
             }
 
-            newObject.PositionChangedEvent += GameObjectPositionChangedEvent;
+            newObject.PositionChangedEvent += PawnPositionChangedEvent;
 
             CheckEachOther(newObject);
 
@@ -62,14 +62,14 @@ namespace UnityOnlineProjectServer.Content.Map
             return newObject;
         }
 
-        private void GameObjectPositionChangedEvent(object sender, Vector3 e)
+        private void PawnPositionChangedEvent(object sender, Vector3 e)
         {
-            var target = sender as GameObject;
+            var target = sender as Pawn;
 
             CheckEachOther(target);
         }
 
-        private void CheckEachOther(GameObject target)
+        private void CheckEachOther(Pawn target)
         {
             //check each other detector
             foreach (var detector in detectors.Keys)
@@ -78,20 +78,20 @@ namespace UnityOnlineProjectServer.Content.Map
 
                 if (detector.isInSight(target))
                 {
-                    detector.AddGameObjectInSight(target);
+                    detector.AddPawnInSight(target);
                 }
                 else
                 {
-                    detector.RemoveGameObjectInSight(target);
+                    detector.RemovePawnInSight(target);
                 }
 
                 if (target.isInSight(detector))
                 {
-                    target.AddGameObjectInSight(detector);
+                    target.AddPawnInSight(detector);
                 }
                 else
                 {
-                    target.RemoveGameObjectInSight(detector);
+                    target.RemovePawnInSight(detector);
                 }
             }
             //check non detector
@@ -99,16 +99,16 @@ namespace UnityOnlineProjectServer.Content.Map
             {
                 if (target.isInSight(nondetector))
                 {
-                    target.AddGameObjectInSight(nondetector);
+                    target.AddPawnInSight(nondetector);
                 }
                 else
                 {
-                    target.RemoveGameObjectInSight(nondetector);
+                    target.RemovePawnInSight(nondetector);
                 }
             }
         }
 
-        public void RemoveGameObject(GameObject target)
+        public void RemovePawn(Pawn target)
         {
             byte dummy;
 
@@ -123,7 +123,7 @@ namespace UnityOnlineProjectServer.Content.Map
 
             foreach (var detector in detectors.Keys)
             {
-                detector.RemoveGameObjectInSight(target);
+                detector.RemovePawnInSight(target);
             }
         }
     }

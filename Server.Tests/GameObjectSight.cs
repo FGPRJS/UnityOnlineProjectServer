@@ -9,14 +9,14 @@ using Xunit;
 
 namespace Server.Tests
 {
-    public class GameObjectSight
+    public class PawnSight
     {
         [Fact]
         public void AddTank()
         {
             GameField field = new GameField();
 
-            field.CreateGameObject(UnityOnlineProjectServer.Content.GameObject.GameObjectType.Tank, new System.Numerics.Vector3(0,0,0));
+            field.CreatePawn(UnityOnlineProjectServer.Content.Pawn.PawnType.Tank, new System.Numerics.Vector3(0,0,0));
 
             Assert.Single(field.detectors);
         }
@@ -26,8 +26,8 @@ namespace Server.Tests
         {
             GameField field = new GameField();
 
-            var newObj1 = field.CreateGameObject(UnityOnlineProjectServer.Content.GameObject.GameObjectType.Tank, new System.Numerics.Vector3(0, 0, 0));
-            var newObj2 = field.CreateGameObject(UnityOnlineProjectServer.Content.GameObject.GameObjectType.Tank, new System.Numerics.Vector3(0, 0, 0));
+            var newObj1 = field.CreatePawn(UnityOnlineProjectServer.Content.Pawn.PawnType.Tank, new System.Numerics.Vector3(0, 0, 0));
+            var newObj2 = field.CreatePawn(UnityOnlineProjectServer.Content.Pawn.PawnType.Tank, new System.Numerics.Vector3(0, 0, 0));
 
             Assert.True(newObj2.id == 2);
             Assert.True(newObj1.GetNearbyObjects().Contains(newObj2));
@@ -39,11 +39,11 @@ namespace Server.Tests
         {
             GameField field = new GameField();
 
-            var newObj1 = field.CreateGameObject(
-                UnityOnlineProjectServer.Content.GameObject.GameObjectType.Tank, 
+            var newObj1 = field.CreatePawn(
+                UnityOnlineProjectServer.Content.Pawn.PawnType.Tank, 
                 new System.Numerics.Vector3(0, 0, 0));
-            var newObj2 = field.CreateGameObject(
-                UnityOnlineProjectServer.Content.GameObject.GameObjectType.Tank, 
+            var newObj2 = field.CreatePawn(
+                UnityOnlineProjectServer.Content.Pawn.PawnType.Tank, 
                 new System.Numerics.Vector3(0, 0, 0));
 
             newObj1.Position = new System.Numerics.Vector3(newObj2.sight + 100, 0, newObj2.sight + 100);
@@ -57,10 +57,10 @@ namespace Server.Tests
         {
             GameField field = new GameField();
 
-            var newObj1 = field.CreateGameObject(UnityOnlineProjectServer.Content.GameObject.GameObjectType.Tank,
+            var newObj1 = field.CreatePawn(UnityOnlineProjectServer.Content.Pawn.PawnType.Tank,
                 new System.Numerics.Vector3(0, 0, 0));
 
-            var newObj2 = field.CreateGameObject(UnityOnlineProjectServer.Content.GameObject.GameObjectType.Tank,
+            var newObj2 = field.CreatePawn(UnityOnlineProjectServer.Content.Pawn.PawnType.Tank,
                 new System.Numerics.Vector3(newObj1.sight + 999, 0, newObj1.sight + 999));
             newObj2.Position = newObj1.Position;
 
@@ -74,14 +74,14 @@ namespace Server.Tests
         {
             GameField field = new GameField();
 
-            var newObj1 = field.CreateGameObject(
-                UnityOnlineProjectServer.Content.GameObject.GameObjectType.Tank,
+            var newObj1 = field.CreatePawn(
+                UnityOnlineProjectServer.Content.Pawn.PawnType.Tank,
                 new System.Numerics.Vector3(0, 0, 0));
-            var newObj2 = field.CreateGameObject(
-                UnityOnlineProjectServer.Content.GameObject.GameObjectType.Tank,
+            var newObj2 = field.CreatePawn(
+                UnityOnlineProjectServer.Content.Pawn.PawnType.Tank,
                 new System.Numerics.Vector3(newObj1.sight - 1, 0, 0));
-            var newObj3 = field.CreateGameObject(
-                UnityOnlineProjectServer.Content.GameObject.GameObjectType.Tank,
+            var newObj3 = field.CreatePawn(
+                UnityOnlineProjectServer.Content.Pawn.PawnType.Tank,
                 new System.Numerics.Vector3(newObj1.sight - 1, 0, 0));
 
             newObj3.Position = new System.Numerics.Vector3(newObj1.sight + 1, 0, 0);
@@ -96,11 +96,11 @@ namespace Server.Tests
         {
             GameField field = new GameField();
 
-            var newObj1 = field.CreateGameObject(UnityOnlineProjectServer.Content.GameObject.GameObjectType.Tank,
+            var newObj1 = field.CreatePawn(UnityOnlineProjectServer.Content.Pawn.PawnType.Tank,
                 new System.Numerics.Vector3(0, 0, 0));
-            var newObj2 = field.CreateGameObject(UnityOnlineProjectServer.Content.GameObject.GameObjectType.Tank,
+            var newObj2 = field.CreatePawn(UnityOnlineProjectServer.Content.Pawn.PawnType.Tank,
                 new System.Numerics.Vector3(newObj1.sight + 999, 0, newObj1.sight + 999));
-            var newObj3 = field.CreateGameObject(UnityOnlineProjectServer.Content.GameObject.GameObjectType.Tank,
+            var newObj3 = field.CreatePawn(UnityOnlineProjectServer.Content.Pawn.PawnType.Tank,
                 new System.Numerics.Vector3(newObj1.sight + 999, 0, newObj1.sight + 999));
 
             newObj3.Position = newObj1.Position;
@@ -123,11 +123,11 @@ namespace Server.Tests
 
             GameField field = new GameField();
 
-            List<GameObject> objs = new List<GameObject>();
+            List<Pawn> objs = new List<Pawn>();
 
             for(int i = 0; i < count; i++)
             {
-                var newObj = field.CreateGameObject(UnityOnlineProjectServer.Content.GameObject.GameObjectType.Tank,
+                var newObj = field.CreatePawn(UnityOnlineProjectServer.Content.Pawn.PawnType.Tank,
                 new System.Numerics.Vector3(0, 0, 0));
 
                 objs.Add(newObj);
@@ -154,11 +154,11 @@ namespace Server.Tests
 
             for (int i = 0; i < count; i++)
             {
-                field.CreateGameObject(UnityOnlineProjectServer.Content.GameObject.GameObjectType.Tank,
+                field.CreatePawn(UnityOnlineProjectServer.Content.Pawn.PawnType.Tank,
                 new System.Numerics.Vector3(0, 0, 0));
             }
 
-            var obj = field.CreateGameObject(GameObject.GameObjectType.Dummy,
+            var obj = field.CreatePawn(Pawn.PawnType.Dummy,
                 new System.Numerics.Vector3(999,9999,99999));
             obj.Position = new System.Numerics.Vector3(0, 0, 0);
 

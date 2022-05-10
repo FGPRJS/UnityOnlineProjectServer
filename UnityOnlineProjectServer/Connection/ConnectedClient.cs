@@ -11,6 +11,8 @@ using UnityOnlineProjectServer.Connection.TickTasking;
 using UnityOnlineProjectServer.Content;
 using UnityOnlineProjectServer.Content.Map;
 using UnityOnlineProjectServer.Protocol;
+using static UnityOnlineProjectServer.Content.GameObject.Implements.Tank;
+using static UnityOnlineProjectServer.Content.Pawn;
 
 namespace UnityOnlineProjectServer.Connection
 {
@@ -26,7 +28,7 @@ namespace UnityOnlineProjectServer.Connection
         public Heartbeat heartbeat;
         public NearbyObjPositionReport nearbyObjPositionReport;
 
-        public GameObject playerObject;
+        public Pawn playerObject;
 
         public readonly long id;
 
@@ -76,7 +78,7 @@ namespace UnityOnlineProjectServer.Connection
 
             foreach (var obj in playerObject.GetNearbyObjects())
             {
-                var message = obj.CreateCurrentStatusMessage(MessageType.GameObjectPositionReport);
+                var message = obj.CreateCurrentStatusMessage(MessageType.PawnPositionReport);
                 SendData(message);
             }
         }
@@ -223,29 +225,45 @@ namespace UnityOnlineProjectServer.Connection
 
                     break;
 
-                case MessageType.TankSpawnRequest:
-
-                    var random = RandomManager.Instance.random;
+                case MessageType.PawnSpawnRequest:
 
                     Vector3 position = new Vector3(
-                        random.Next(100, 800),
+                        RandomManager.GetRandomWithfloatingPoint(100, 800),
                         20,
-                        random.Next(100, 800));
+                        RandomManager.GetRandomWithfloatingPoint(100, 800));
 
                     Quaternion rotation = Quaternion.CreateFromYawPitchRoll(
                         0,
-                        random.Next(-180, 180),
+                        RandomManager.GetRandomWithfloatingPoint(1, 2),
                         0);
+                    
+                    //Get Type   
+                    var objectType = (PawnType)Enum.Parse(typeof(PawnType), message.body.Any["ObjectType"]);
+                    var subobjectType = "";
+
+                    //Create Sub Type
+                    switch (objectType)
+                    {
+                        case PawnType.Tank:
+
+                            var values = Enum.GetValues(typeof(TankType));
+                            var subtype = values.GetValue(RandomManager.GetIntegerRandom(0, values.Length));
+                            subobjectType = subtype.ToString();
+
+                            break;
+                    }
 
                     //Create Object
-                    playerObject = currentField.CreateGameObject(GameObject.GameObjectType.Tank, position);
+                    playerObject = currentField.CreatePawn(objectType, position);
                     playerObject.Rotation = rotation;
 
                     message.body = new Body<Dictionary<string, string>>()
                     {
                         Any = new Dictionary<string, string>()
                         {
-                            ["Type"] = random.Next(0, 4).ToString(),
+                            ["ID"] = playerObject.id.ToString(),
+                            ["ObjectType"] = message.body.Any["ObjectType"],
+                            ["ObjectSubType"] = subobjectType,
                             ["Position"] = position.ToString(),
                             ["Quaternion"] = rotation.ToString()
                         }
@@ -255,7 +273,7 @@ namespace UnityOnlineProjectServer.Connection
 
                     break;
 
-                case MessageType.GameObjectPositionReport:
+                case MessageType.PawnPositionReport:
 
                     playerObject.ApplyCurrentStatusMessage(message);
 
@@ -348,8 +366,16 @@ namespace UnityOnlineProjectServer.Connection
             heartbeat.TickEvent -= HeartbeatTickEventAction;
             heartbeat = null;
 
+            //Remove Controlling object
             playerObject.SendMessageRequestEvent -= SendMessageRequestEventAction;
-            playerObject = null;
+            if (playerObject != null)
+            {
+                currentField.RemovePawn(playerObject);
+                playerObject = null;
+            }
+
+            nearbyObjPositionReport.TickEvent -= ReportNearbyObjPosition;
+            nearbyObjPositionReport = null;
 
             communicationData.ResetDataFrame();
             communicationData = null;

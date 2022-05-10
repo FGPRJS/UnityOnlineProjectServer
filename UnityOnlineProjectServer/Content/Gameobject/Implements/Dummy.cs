@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Text;
 using UnityOnlineProjectServer.Protocol;
 
-namespace UnityOnlineProjectServer.Content.Gameobject.Implements
+namespace UnityOnlineProjectServer.Content.GameObject.Implements
 {
-    public class Dummy : GameObject
+    public class Dummy : Pawn
     {
         public Dummy(long id) : base(id)
         {

@@ -8,13 +8,19 @@ using UnityOnlineProjectServer.Content;
 using UnityOnlineProjectServer.Protocol;
 using UnityOnlineProjectServer.Utility;
 
-namespace UnityOnlineProjectServer.Content.Gameobject.Implements
+namespace UnityOnlineProjectServer.Content.GameObject.Implements
 {
-    public class Tank : GameObject
+    public class Tank : Pawn
     {
         public Quaternion TowerRotation;
         public Quaternion CannonRotation;
-
+        public enum TankType
+        {
+            Red = 0,
+            Yellow,
+            Green,
+            Blue
+        }
         public Tank(long id) : base(id)
         {
             isDetector = true;

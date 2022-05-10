@@ -8,20 +8,12 @@ namespace UnityOnlineProjectServer.Protocol
     {
         LoginRequest,
         HeartBeatRequest,
-        TankSpawnRequest,
-        GameObjectSpawnReport,
-        GameObjectDestroyReport,
-        GameObjectPositionReport,
-        GameObjectActionRequest,
+        PawnSpawnRequest,
+        PawnSpawnReport,
+        PawnDestroyReport,
+        PawnPositionReport,
+        PawnActionRequest,
         PlayerChatReport
-    }
-
-    public enum TankType
-    {
-        Red = 0,
-        Yellow,
-        Green,
-        Blue
     }
 
     public enum ACK
