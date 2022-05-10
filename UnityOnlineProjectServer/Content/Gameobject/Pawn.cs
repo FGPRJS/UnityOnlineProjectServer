@@ -10,16 +10,16 @@ using UnityOnlineProjectServer.Utility;
 
 namespace UnityOnlineProjectServer.Content
 {
-    public abstract class GameObject
+    public abstract class Pawn
     {
-        public enum GameObjectType
+        public enum PawnType
         {
             Dummy,
             Tank
         }
 
         public long id;
-        public string GameObjectName;
+        public string PawnName;
 
         public bool isDetector;
         public float sight;
@@ -41,7 +41,7 @@ namespace UnityOnlineProjectServer.Content
         public event EventHandler<Vector3> PositionChangedEvent;
         public event EventHandler<CommunicationMessage<Dictionary<string, string>>> SendMessageRequestEvent;
 
-        public GameObject(long id)
+        public Pawn(long id)
         {
             //ID
             this.id = id;
@@ -54,7 +54,7 @@ namespace UnityOnlineProjectServer.Content
             PositionChangedEvent += CurrentPositionChangedEvent;
 
             //NearbyObjects
-            _nearbyObjects = new ConcurrentDictionary<GameObject, byte>();
+            _nearbyObjects = new ConcurrentDictionary<Pawn, byte>();
         }
 
         
@@ -69,20 +69,20 @@ namespace UnityOnlineProjectServer.Content
                 {
                     if (!isInSight(target))
                     {
-                        RemoveGameObjectInSight(target);
+                        RemovePawnInSight(target);
                     }
                 }
             }
         }
 
-        ~GameObject()
+        ~Pawn()
         {
             positionReport.TickEvent -= TickEventAction;
         }
 
         void TickEventAction(object sender, EventArgs arg)
         {
-            var somedata = CreateCurrentStatusMessage(MessageType.GameObjectPositionReport);
+            var somedata = CreateCurrentStatusMessage(MessageType.PawnPositionReport);
             SendMessageRequestEvent?.Invoke(sender, somedata);
         }
 
@@ -96,9 +96,9 @@ namespace UnityOnlineProjectServer.Content
         }
 
         #region Sight
-        private ConcurrentDictionary<GameObject, byte> _nearbyObjects;
+        private ConcurrentDictionary<Pawn, byte> _nearbyObjects;
 
-        public bool isInSight(GameObject other)
+        public bool isInSight(Pawn other)
         {
             var XZPow = Math.Pow(other.Position.X - Position.X, 2) + Math.Pow(other.Position.Z - Position.Z, 2);
             if (XZPow < Math.Pow(sight, 2))
@@ -108,18 +108,18 @@ namespace UnityOnlineProjectServer.Content
             return false;
         }
 
-        public void AddGameObjectInSight(GameObject obj)
+        public void AddPawnInSight(Pawn obj)
         {
             if (!isDetector) return;
             if (_nearbyObjects.ContainsKey(obj)) return;
 
             _nearbyObjects.TryAdd(obj, (byte)0);
 
-            var message = obj.CreateCurrentStatusMessage(MessageType.GameObjectSpawnReport);
+            var message = obj.CreateCurrentStatusMessage(MessageType.PawnSpawnReport);
             SendMessageRequestEvent?.Invoke(this, message);
         }
 
-        public void RemoveGameObjectInSight(GameObject obj)
+        public void RemovePawnInSight(Pawn obj)
         {
             if (!isDetector) return;
             if (!_nearbyObjects.ContainsKey(obj)) return;
@@ -127,11 +127,11 @@ namespace UnityOnlineProjectServer.Content
             byte dummy;
             _nearbyObjects.TryRemove(obj, out dummy);
 
-            var message = obj.CreateCurrentStatusMessage(MessageType.GameObjectDestroyReport);
+            var message = obj.CreateCurrentStatusMessage(MessageType.PawnDestroyReport);
             SendMessageRequestEvent?.Invoke(this, message);
         }
 
-        public ICollection<GameObject> GetNearbyObjects()
+        public ICollection<Pawn> GetNearbyObjects()
         {
             var nearbyObjects = _nearbyObjects.Keys;
             return nearbyObjects;
