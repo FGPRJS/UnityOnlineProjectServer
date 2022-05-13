@@ -9,7 +9,6 @@ namespace UnityOnlineProjectServer.Connection
         public static int BufferSize = 4096;
         public byte[] buffer = new byte[BufferSize];
 
-        public bool SOF = false;
         private Queue<byte> _dataQueue = new Queue<byte>();
         public string GetStringData()
         {
@@ -34,7 +33,6 @@ namespace UnityOnlineProjectServer.Connection
         public void ResetDataFrame()
         {
             FlushDataQueue();
-            SOF = false;
         }
     }
 }

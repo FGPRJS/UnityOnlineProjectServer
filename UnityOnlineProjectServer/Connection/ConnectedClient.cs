@@ -2,9 +2,12 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Net.Sockets;
 using System.Numerics;
+using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityOnlineProjectServer.Connection.TickTasking;
@@ -20,7 +23,16 @@ namespace UnityOnlineProjectServer.Connection
     {
         public GameField currentField;
 
-        public Socket ClientSocket;
+        public enum SocketStatus
+        {
+            Disconnected,
+            HandShaking,
+            Connected
+        }
+        public SocketStatus socketStatus;
+        
+        public TcpClient client;
+        public NetworkStream stream;
         public DataFrame communicationData;
 
         public string clientName;
@@ -41,14 +53,22 @@ namespace UnityOnlineProjectServer.Connection
             this.id = id;
         }
 
-        public void Initialize(Socket socket)
+        public void Initialize(TcpClient client)
         {
+            //Initialize Data
             communicationData = new DataFrame();
 
-            this.ClientSocket = socket;
-            socket.ReceiveBufferSize = DataFrame.BufferSize;
-            socket.SendBufferSize = DataFrame.BufferSize;
+            //Initialize Socket
+            this.client = client;
+            this.client.ReceiveBufferSize = DataFrame.BufferSize;
+            this.client.SendBufferSize = DataFrame.BufferSize;
 
+            //Initialize Socket stream
+            stream = this.client.GetStream();
+
+            socketStatus = SocketStatus.Disconnected;
+
+            //Initialize Heartbeat
             heartbeat = new Heartbeat();
             heartbeat.TimeoutEvent += HeartbeatTimeOutEventAction;
             heartbeat.TickEvent += HeartbeatTickEventAction;
@@ -57,7 +77,7 @@ namespace UnityOnlineProjectServer.Connection
             nearbyObjPositionReport = new NearbyObjPositionReport();
             nearbyObjPositionReport.TickEvent += ReportNearbyObjPosition;
 
-            BeginReceive();
+            HandShaking();
         }
 
         #region Event Action
@@ -90,17 +110,93 @@ namespace UnityOnlineProjectServer.Connection
 
         #endregion
 
+        #region HandShaking
+
+        void HandShaking()
+        {
+            try
+            {
+                socketStatus = SocketStatus.HandShaking;
+
+                stream.BeginRead(
+                    communicationData.buffer,
+                    0,
+                    DataFrame.BufferSize,
+                    HandShakingCallBack,
+                    client);
+            }
+            catch (NullReferenceException ne)
+            {
+                Console.WriteLine("ClientSocket Lost");
+            }
+            catch (SocketException se)
+            {
+                Console.WriteLine("Socket is not available. Shutdown Client.");
+                ShutDownRequest();
+            }
+        }
+
+        private async void HandShakingCallBack(IAsyncResult ar)
+        {
+            try
+            {
+                int bytesRead = stream.EndRead(ar);
+
+                byte[] readedData = new byte[bytesRead];
+
+                Array.Copy(communicationData.buffer, readedData, bytesRead);
+
+                string handShakingRequest = Encoding.UTF8.GetString(readedData);
+
+                if (handShakingRequest.Contains("GET"))
+                {
+                    //HandShake Reply
+                    string websocketKey = Regex.Match(handShakingRequest, "Sec-WebSocket-Key: (.*)").Groups[1].Value.Trim();
+                    string websocketKeyReply = websocketKey + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+                    byte[] websocketKeyReplySHA1 = SHA1.Create().ComputeHash(Encoding.UTF8.GetBytes(websocketKeyReply));
+                    string websocketKeyReplySHA1Base64 = Convert.ToBase64String(websocketKeyReplySHA1);
+
+                    byte[] response = Encoding.UTF8.GetBytes(
+                        "HTTP/1.1 101 Switching Protocols\r\n" +
+                        "Upgrade: websocket\r\n" +
+                        "Connection: Upgrade\r\n" +
+                        "Sec-WebSocket-Accept: " + websocketKeyReplySHA1Base64 + "\r\n\r\n");
+
+                    await SendData(response);
+
+                    BeginReceive();
+                }
+                //Handshaking Crashed.
+                else
+                {
+                    byte[] response = Encoding.UTF8.GetBytes(
+                        "HTTP/1.1 400 Bad Request\r\n");
+
+                    await SendData(response);
+
+                    Console.WriteLine("Handshaking Failed.");
+                    ShutDownRequest();
+                }
+            }
+            catch
+            {
+                Console.WriteLine("Handshaking Failed.");
+                ShutDownRequest();
+            }
+        }
+
+        #endregion
+
         void BeginReceive()
         {
             try
             {
-                ClientSocket?.BeginReceive(
-                communicationData.buffer,
-                0,
-                DataFrame.BufferSize,
-                SocketFlags.None,
-                DataReceivedCallback,
-                ClientSocket);
+                stream.BeginRead(
+                    communicationData.buffer,
+                    0,
+                    DataFrame.BufferSize,
+                    DataReceivedCallback,
+                    client);
             }
             catch(NullReferenceException ne)
             {
@@ -117,9 +213,10 @@ namespace UnityOnlineProjectServer.Connection
         {
             try
             {
-                int bytesRead = ClientSocket.EndReceive(ar);
+                int bytesRead = stream.EndRead(ar);
+                Console.WriteLine($"{bytesRead}byte(s) Data Received.");
 
-                if(bytesRead > 0)
+                if (bytesRead > 0)
                 {
                     ProcessDataFrame(bytesRead);
 
@@ -134,17 +231,12 @@ namespace UnityOnlineProjectServer.Connection
             }
             catch (NullReferenceException)
             {
-                Console.WriteLine("ClientSocket Lost");
+                Console.WriteLine("Network Stream Lost");
                 ShutDownRequest();
             }
-            catch (ObjectDisposedException)
+            catch (IOException)
             {
-                Console.WriteLine("ClientSocket is Disposed");
-                ShutDownRequest();
-            }
-            catch (SocketException)
-            {
-                Console.WriteLine("Socket is not available. Shutdown Client.");
+                Console.WriteLine("Network Stream is not available. Shutdown Client.");
                 ShutDownRequest();
             }
         }
@@ -153,52 +245,55 @@ namespace UnityOnlineProjectServer.Connection
 
         private void ProcessDataFrame(int bytesRead)
         {
-            if (bytesRead > 0)
-            {
-                for (var i = 0; i < bytesRead; i++)
-                {
-                    switch (communicationData.buffer[i])
-                    {
-                        case 0x01:
 
-                            if (!communicationData.SOF)
-                            {
-                                communicationData.SOF = true;
-                            }
-                            //Already SOF exist => discard before data
-                            else
-                            {
-                                communicationData.ResetDataFrame();
-                            }
+            //for (var i = 0; i < bytesRead; i++)
+            //{
+            //    switch (communicationData.buffer[i])
+            //    {
 
-                            break;
+            //    }
 
-                        case 0x02:
+            //    switch (communicationData.buffer[i])
+            //    {
+            //        case 0x01:
 
-                            //Completed Message. Process
-                            if (communicationData.SOF)
-                            {
-                                var completeData = communicationData.GetByteData();
-                                var receivedMessage = CommunicationUtility.Deserialize(completeData);
-                                ProcessMessage(receivedMessage);
-                            }
-                            //Incomplete Message. Discard
-                            communicationData.ResetDataFrame();
+            //            if (!communicationData.SOF)
+            //            {
+            //                communicationData.SOF = true;
+            //            }
+            //            //Already SOF exist => discard before data
+            //            else
+            //            {
+            //                communicationData.ResetDataFrame();
+            //            }
+
+            //            break;
+
+            //        case 0x02:
+
+            //            //Completed Message. Process
+            //            if (communicationData.SOF)
+            //            {
+            //                var completeData = communicationData.GetByteData();
+            //                var receivedMessage = CommunicationUtility.Deserialize(completeData);
+            //                ProcessMessage(receivedMessage);
+            //            }
+            //            //Incomplete Message. Discard
+            //            communicationData.ResetDataFrame();
 
 
-                            break;
+            //            break;
 
-                        default:
+            //        default:
 
-                            if (communicationData.SOF)
-                            {
-                                communicationData.AddByte(communicationData.buffer[i]);
-                            }
+            //            if (communicationData.SOF)
+            //            {
+            //                communicationData.AddByte(communicationData.buffer[i]);
+            //            }
 
-                            break;
-                    }
-                }
-            }
+            //            break;
+            //    }
+            //}
         }
 
 
@@ -324,26 +419,17 @@ namespace UnityOnlineProjectServer.Connection
             }
         }
 
-        public void SendData(byte[] byteData)
+        public async Task SendData(byte[] byteData)
         {
             try
             {
                 Console.WriteLine("Send data to client.");
 
-                var sendData = new byte[byteData.Length + 2];
-                //Set SOF
-                sendData[0] = 0x01;
-                Array.Copy(byteData, 0, sendData, 1, byteData.Length);
-                //Set EOF
-                sendData[^1] = 0x02;
-
-                ClientSocket?.BeginSend(
-                    sendData,
+                await stream.WriteAsync(
+                    byteData,
                     0,
-                    sendData.Length,
-                    SocketFlags.None,
-                    SendCallback,
-                    ClientSocket);
+                    byteData.Length,
+                    CancellationToken.None);
             }
             catch (Exception ex)
             {
@@ -351,22 +437,6 @@ namespace UnityOnlineProjectServer.Connection
             }
         }
 
-        private void SendCallback(IAsyncResult ar)
-        {
-            try
-            {
-                // Retrieve the socket from the state object.  
-                Socket handler = (Socket)ar.AsyncState;
-
-                // Complete sending the data to the remote device.  
-                int bytesSent = handler.EndSend(ar);
-                Console.WriteLine("Sent {0} bytes to client.", bytesSent);
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine("Send Failed. Reason : " + e.Message);
-            }
-        }
         #endregion
 
         public void ShutDownRequest()
@@ -391,7 +461,7 @@ namespace UnityOnlineProjectServer.Connection
             communicationData.ResetDataFrame();
             communicationData = null;
 
-            ClientSocket = null;
+            client = null;
 
             ShutdownRequestEvent.Invoke(id);
         }

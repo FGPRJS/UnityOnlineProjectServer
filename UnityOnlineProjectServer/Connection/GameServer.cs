@@ -16,7 +16,7 @@ namespace UnityOnlineProjectServer.Connection
     public class GameServer
     {
         public bool isRun;
-        public Socket socket;
+        public TcpListener listener;
 
         private readonly long clientCount = 100;
         private ConcurrentDictionary<long, ConnectedClient> clients;
@@ -24,17 +24,10 @@ namespace UnityOnlineProjectServer.Connection
         private readonly long gameFieldCount = 1;
         private ConcurrentDictionary<long, GameField> gameFields;
 
-        private int pendingConnectionQueueCount = 100;
         public int Port = 8080;
 
         public GameServer()
         {
-            // Create Socket
-            socket = new Socket(
-                AddressFamily.InterNetwork, 
-                SocketType.Stream, 
-                ProtocolType.Tcp);
-
             //Create Clients
             clients = new ConcurrentDictionary<long, ConnectedClient>();
 
@@ -62,9 +55,9 @@ namespace UnityOnlineProjectServer.Connection
 
             IPHostEntry ipHostInfo = Dns.GetHostEntry(Dns.GetHostName());
             IPAddress ipAddress = ipHostInfo.AddressList[0];
-            IPEndPoint endPoint = new IPEndPoint(ipAddress, Port);
+            listener = new TcpListener(ipAddress, Port);
 
-            OpenServer(endPoint);
+            OpenServer();
         }
 
         public void StartLocal()
@@ -73,18 +66,18 @@ namespace UnityOnlineProjectServer.Connection
 
             IPHostEntry ipHostInfo = Dns.GetHostEntry("localhost");
             IPAddress ipAddress = ipHostInfo.AddressList[1];
-            IPEndPoint endPoint = new IPEndPoint(ipAddress, Port);
+            listener = new TcpListener(ipAddress, Port);
 
-            OpenServer(endPoint);
+            OpenServer();
         }
 
-        private void OpenServer(IPEndPoint endPoint)
+        private void OpenServer()
         {
             try
             {
-                socket.Bind(endPoint);
-                socket.Listen(pendingConnectionQueueCount);
-                socket.BeginAccept(ClientAccepted, socket);
+                listener.Start();
+
+                listener.BeginAcceptTcpClient(ClientAccepted, listener);
                 isRun = true;
                 InitializeGlobalServerTask();
             }
@@ -96,11 +89,12 @@ namespace UnityOnlineProjectServer.Connection
 
         private void ClientAccepted(IAsyncResult ar)
         {
+            Console.WriteLine("Connecting client detected");
+
             // Get the socket that handles the client request.  
-            var clientSocket = (Socket)ar.AsyncState;
-            Socket handler = clientSocket.EndAccept(ar);
+            var client = listener.EndAcceptTcpClient(ar);
             // Wait for other Client
-            socket.BeginAccept(ClientAccepted, socket);
+            listener.BeginAcceptTcpClient(ClientAccepted, listener);
 
             GameField availableField = null;
 
@@ -119,11 +113,12 @@ namespace UnityOnlineProjectServer.Connection
             //Find Client
             for (long i = 0; i < clients.Count; i++)
             {
-                if(clients[i].ClientSocket == null)
+                var connectedClient = clients[i];
+
+                if (connectedClient != null)
                 {
-                    clients[i].Initialize(handler);
+                    clients[i].Initialize(client);
                     clients[i].currentField = availableField;
-                    Console.WriteLine("Client Connected");
                     return;
                 }
             }
@@ -197,11 +192,10 @@ namespace UnityOnlineProjectServer.Connection
         {
             var client = clients[id];
 
-            if (client.ClientSocket != null)
+            if (client.client != null)
             {
-                client.ClientSocket.Shutdown(SocketShutdown.Both);
-                client.ClientSocket.Close();
-                client.ClientSocket = null;
+                client.client.Close();
+                client.client = null;
             }
         }
 
@@ -228,8 +222,7 @@ namespace UnityOnlineProjectServer.Connection
             CancelGlobalServerTask();
 
             //Server ShutDown
-            socket.Shutdown(SocketShutdown.Both);
-            socket.Close();
+            listener.Stop();
 
             Console.WriteLine("Shutdown server complete!");
         }
