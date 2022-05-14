@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json;
 using System;
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
@@ -14,6 +15,7 @@ using UnityOnlineProjectServer.Connection.TickTasking;
 using UnityOnlineProjectServer.Content;
 using UnityOnlineProjectServer.Content.Map;
 using UnityOnlineProjectServer.Protocol;
+using UnityOnlineProjectServer.Utility;
 using static UnityOnlineProjectServer.Content.GameObject.Implements.Tank;
 using static UnityOnlineProjectServer.Content.Pawn;
 
@@ -33,7 +35,7 @@ namespace UnityOnlineProjectServer.Connection
         
         public TcpClient client;
         public NetworkStream stream;
-        public DataFrame communicationData;
+        public DataBuffer receivedData;
 
         public string clientName;
 
@@ -56,12 +58,13 @@ namespace UnityOnlineProjectServer.Connection
         public void Initialize(TcpClient client)
         {
             //Initialize Data
-            communicationData = new DataFrame();
+            receivedData = new DataBuffer();
+            receivedData.Initialize();
 
             //Initialize Socket
             this.client = client;
-            this.client.ReceiveBufferSize = DataFrame.BufferSize;
-            this.client.SendBufferSize = DataFrame.BufferSize;
+            this.client.ReceiveBufferSize = DataBuffer.BufferSize;
+            this.client.SendBufferSize = DataBuffer.BufferSize;
 
             //Initialize Socket stream
             stream = this.client.GetStream();
@@ -119,9 +122,9 @@ namespace UnityOnlineProjectServer.Connection
                 socketStatus = SocketStatus.HandShaking;
 
                 stream.BeginRead(
-                    communicationData.buffer,
+                    receivedData.buffer,
                     0,
-                    DataFrame.BufferSize,
+                    DataBuffer.BufferSize,
                     HandShakingCallBack,
                     client);
             }
@@ -144,7 +147,7 @@ namespace UnityOnlineProjectServer.Connection
 
                 byte[] readedData = new byte[bytesRead];
 
-                Array.Copy(communicationData.buffer, readedData, bytesRead);
+                Array.Copy(receivedData.buffer, readedData, bytesRead);
 
                 string handShakingRequest = Encoding.UTF8.GetString(readedData);
 
@@ -164,11 +167,15 @@ namespace UnityOnlineProjectServer.Connection
 
                     await SendData(response);
 
+                    socketStatus = SocketStatus.Connected;
+
                     BeginReceive();
                 }
                 //Handshaking Crashed.
                 else
                 {
+                    socketStatus = SocketStatus.Disconnected;
+
                     byte[] response = Encoding.UTF8.GetBytes(
                         "HTTP/1.1 400 Bad Request\r\n");
 
@@ -192,9 +199,9 @@ namespace UnityOnlineProjectServer.Connection
             try
             {
                 stream.BeginRead(
-                    communicationData.buffer,
+                    receivedData.buffer,
                     0,
-                    DataFrame.BufferSize,
+                    DataBuffer.BufferSize,
                     DataReceivedCallback,
                     client);
             }
@@ -218,7 +225,7 @@ namespace UnityOnlineProjectServer.Connection
 
                 if (bytesRead > 0)
                 {
-                    ProcessDataFrame(bytesRead);
+                    DecodeFrameRFC6455(bytesRead);
 
                     heartbeat.ResetTimer();
                     BeginReceive();
@@ -243,57 +250,155 @@ namespace UnityOnlineProjectServer.Connection
 
         #region Process Received Data Frame
 
-        private void ProcessDataFrame(int bytesRead)
+        private void DecodeFrameRFC6455(int bytesRead)
         {
+            for(var i = 0; i < bytesRead; i++)
+            {
+                var data = receivedData.buffer[i];
+                bool[] dataBitArr;
 
-            //for (var i = 0; i < bytesRead; i++)
-            //{
-            //    switch (communicationData.buffer[i])
-            //    {
+                switch (receivedData.frame.process)
+                {
+                    case DataFrame.DataFrameProcess.None:
+                    case DataFrame.DataFrameProcess.FIN_OPCode:
 
-            //    }
+                        dataBitArr = BitByte.BytetoBitArray(data);
+                        //FINBit = 1
+                        if(dataBitArr[0])
+                        {
+                            //OPCode
+                            receivedData.frame.opcode = (DataFrame.OPCode)BitByte.PartofBitArraytoByte(dataBitArr, 4);
+                            if(Enum.IsDefined(typeof(DataFrame.OPCode), receivedData.frame.opcode))
+                            {
+                                receivedData.frame.process = DataFrame.DataFrameProcess.MASK_PayloadLen;
+                                receivedData.frame.hasContinuousData = false;
+                            }
+                            else
+                            {
+                                receivedData.frame.ResetFrame();
+                            }
+                        }
+                        //FINBit = 0 -> isContinuous?
+                        else
+                        {
+                            receivedData.frame.hasContinuousData = true;
+                        }
 
-            //    switch (communicationData.buffer[i])
-            //    {
-            //        case 0x01:
+                        break;
 
-            //            if (!communicationData.SOF)
-            //            {
-            //                communicationData.SOF = true;
-            //            }
-            //            //Already SOF exist => discard before data
-            //            else
-            //            {
-            //                communicationData.ResetDataFrame();
-            //            }
+                    case DataFrame.DataFrameProcess.MASK_PayloadLen:
 
-            //            break;
-
-            //        case 0x02:
-
-            //            //Completed Message. Process
-            //            if (communicationData.SOF)
-            //            {
-            //                var completeData = communicationData.GetByteData();
-            //                var receivedMessage = CommunicationUtility.Deserialize(completeData);
-            //                ProcessMessage(receivedMessage);
-            //            }
-            //            //Incomplete Message. Discard
-            //            communicationData.ResetDataFrame();
+                        dataBitArr = BitByte.BytetoBitArray(data);
+                        //MASKBit
+                        receivedData.frame.isMasked = dataBitArr[0];
+                        if (receivedData.frame.isMasked)
+                        {
+                            receivedData.frame.maskingKey = new byte[4];
+                        }
 
 
-            //            break;
+                        //Length Byte(Part of)
+                        var byteLength = BitByte.PartofBitArraytoByte(dataBitArr, 1);
 
-            //        default:
+                        if (byteLength < 126)
+                        {
+                            receivedData.frame.PayloadLength = byteLength;
+                            receivedData.frame.data = new byte[byteLength];
+                            receivedData.frame.process = DataFrame.DataFrameProcess.MaskingKey;
+                        }
+                        else if(byteLength == 126)
+                        {
+                            receivedData.frame.payloadIndex = 1;
+                            receivedData.frame.process = DataFrame.DataFrameProcess.PayloadLen16;
+                        }
+                        else
+                        {
+                            receivedData.frame.payloadIndex = 7;
+                            receivedData.frame.process = DataFrame.DataFrameProcess.PayloadLen64;
+                        }
 
-            //            if (communicationData.SOF)
-            //            {
-            //                communicationData.AddByte(communicationData.buffer[i]);
-            //            }
+                        break;
 
-            //            break;
-            //    }
-            //}
+                    case DataFrame.DataFrameProcess.PayloadLen16:
+
+                        receivedData.frame.PayloadLength += receivedData.buffer[i] << (8 * receivedData.frame.payloadIndex);
+                        receivedData.frame.payloadIndex--;
+
+                        if (receivedData.frame.payloadIndex < 0)
+                        {
+                            receivedData.frame.data = new byte[receivedData.frame.PayloadLength];
+                            receivedData.frame.process = DataFrame.DataFrameProcess.MaskingKey;
+                        }
+
+                        break;
+
+                    case DataFrame.DataFrameProcess.PayloadLen64:
+
+                        receivedData.frame.PayloadLength += receivedData.buffer[i] << (8 * receivedData.frame.payloadIndex);
+                        receivedData.frame.payloadIndex--;
+
+                        if (receivedData.frame.payloadIndex < 0)
+                        {
+                            receivedData.frame.data = new byte[receivedData.frame.PayloadLength];
+                            receivedData.frame.process = DataFrame.DataFrameProcess.MaskingKey;
+                        }
+
+                        break;
+
+                    case DataFrame.DataFrameProcess.MaskingKey:
+
+                        if (receivedData.frame.isMasked)
+                        {
+                            receivedData.frame.maskingKey[receivedData.frame.maskingIndex] = receivedData.buffer[i];
+                            receivedData.frame.maskingIndex++;
+                            if (receivedData.frame.maskingIndex >= receivedData.frame.maskingKey.Length)
+                            {
+                                receivedData.frame.process = DataFrame.DataFrameProcess.DATA;
+                            }
+                        }
+                        else
+                        {
+                            receivedData.frame.process = DataFrame.DataFrameProcess.DATA;
+                        }
+
+                        break;
+
+                    case DataFrame.DataFrameProcess.DATA:
+
+                        
+                        if (receivedData.frame.isMasked)
+                        {
+                            byte decodedByte = (byte)(receivedData.buffer[i] ^ receivedData.frame.maskingKey[receivedData.frame.dataIndex % 4]);
+                            receivedData.frame.data[receivedData.frame.dataIndex] = decodedByte;
+                        }
+                        else
+                        {
+                            receivedData.frame.data[receivedData.frame.dataIndex] = receivedData.buffer[i];
+                        }
+
+                        receivedData.frame.dataIndex++;
+
+                        if (receivedData.frame.dataIndex >= receivedData.frame.PayloadLength)
+                        {
+                            //Receive Complete
+                            receivedData.frame.process = DataFrame.DataFrameProcess.FIN_OPCode;
+
+                            if (!receivedData.frame.hasContinuousData)
+                            {
+                                //Temp
+                                Console.WriteLine(Encoding.UTF8.GetString(receivedData.frame.data));
+
+
+                                receivedData.frame.ResetFrame();
+                            }
+                        }
+
+                        break;
+                }
+
+                //Clear Byte
+                receivedData.buffer[i] = 0;
+            }
         }
 
 
@@ -442,9 +547,12 @@ namespace UnityOnlineProjectServer.Connection
         public void ShutDownRequest()
         {
             //Clear Event
-            heartbeat.TimeoutEvent -= HeartbeatTimeOutEventAction;
-            heartbeat.TickEvent -= HeartbeatTickEventAction;
-            heartbeat = null;
+            if(heartbeat != null)
+            {
+                heartbeat.TimeoutEvent -= HeartbeatTimeOutEventAction;
+                heartbeat.TickEvent -= HeartbeatTickEventAction;
+                heartbeat = null;
+            }
 
             if (playerObject != null)
             {
@@ -455,11 +563,13 @@ namespace UnityOnlineProjectServer.Connection
                 playerObject = null;
             }
 
-            nearbyObjPositionReport.TickEvent -= ReportNearbyObjPosition;
-            nearbyObjPositionReport = null;
+            if(nearbyObjPositionReport != null)
+            {
+                nearbyObjPositionReport.TickEvent -= ReportNearbyObjPosition;
+                nearbyObjPositionReport = null;
+            }
 
-            communicationData.ResetDataFrame();
-            communicationData = null;
+            receivedData = null;
 
             client = null;
 
