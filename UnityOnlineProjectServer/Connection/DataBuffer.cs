@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using UnityOnlineProjectServer.Protocol;
+using UnityOnlineProjectServer.Utility;
 
 namespace UnityOnlineProjectServer.Connection
 {
@@ -8,30 +10,248 @@ namespace UnityOnlineProjectServer.Connection
     {
         public static int BufferSize = 4096;
         public byte[] buffer = new byte[BufferSize];
-        public DataFrame frame;
+        private DataFrame frame;
         
         public void Initialize()
         {
             frame = new DataFrame();
         }
 
-        /// <summary>
-        /// Check frame info if continuous data frame comes.
-        /// if this functions result is FALSE and continuous frame comes, it means data crashed.
-        /// </summary>
-        /// <returns></returns>
-        public bool hasContinuableData()
+        public CommunicationMessage<Dictionary<string, string>> DecodeFrameRFC6455(int bytesRead)
         {
-            if (frame.FIN)
+            for (var i = 0; i < bytesRead; i++)
             {
-                return true;
+                var data = buffer[i];
+                bool[] dataBitArr;
+
+                switch (frame.process)
+                {
+                    case DataFrame.DataFrameProcess.None:
+                    case DataFrame.DataFrameProcess.FIN_OPCode:
+
+                        dataBitArr = BitByte.BytetoBitArray(data);
+                        //FINBit = 1
+                        if (dataBitArr[0])
+                        {
+                            //OPCode
+                            frame.opcode = (DataFrame.OPCode)BitByte.PartofBitArraytoByte(dataBitArr, 4);
+                            if (Enum.IsDefined(typeof(DataFrame.OPCode), frame.opcode))
+                            {
+                                switch (frame.opcode)
+                                {
+                                    case DataFrame.OPCode.Ping:
+
+                                        var pingMessage = new CommunicationMessage<Dictionary<string, string>>()
+                                        {
+                                            header = new Header()
+                                            {
+                                                MessageName = MessageType.Ping.ToString(),
+                                            }
+                                        };
+
+                                        frame.ResetFrame();
+
+                                        return pingMessage;
+
+                                    case DataFrame.OPCode.Pong:
+
+                                        var pongMessage = new CommunicationMessage<Dictionary<string, string>>()
+                                        {
+                                            header = new Header()
+                                            {
+                                                MessageName = MessageType.Pong.ToString(),
+                                            }
+                                        };
+
+                                        frame.ResetFrame();
+
+                                        return pongMessage;
+
+                                    case DataFrame.OPCode.Close:
+
+                                        var closeMessage = new CommunicationMessage<Dictionary<string, string>>()
+                                        {
+                                            header = new Header()
+                                            {
+                                                MessageName = MessageType.Close.ToString(),
+                                            }
+                                        };
+
+                                        frame.ResetFrame();
+
+                                        return closeMessage;
+
+                                    default:
+                                        frame.process = DataFrame.DataFrameProcess.MASK_PayloadLen;
+                                        frame.hasContinuousData = false;
+                                        break;
+                                }
+                            }
+                            else
+                            {
+                                frame.ResetFrame();
+                            }
+                        }
+                        //FINBit = 0 -> isContinuous?
+                        else
+                        {
+                            frame.hasContinuousData = true;
+                        }
+
+                        break;
+
+                    case DataFrame.DataFrameProcess.MASK_PayloadLen:
+
+                        dataBitArr = BitByte.BytetoBitArray(data);
+                        //MASKBit
+                        frame.isMasked = dataBitArr[0];
+                        if (frame.isMasked)
+                        {
+                            frame.maskingKey = new byte[4];
+                        }
+
+
+                        //Length Byte(Part of)
+                        var byteLength = BitByte.PartofBitArraytoByte(dataBitArr, 1);
+
+                        if (byteLength < 126)
+                        {
+                            frame.PayloadLength = byteLength;
+                            frame.data = new byte[byteLength];
+                            frame.process = DataFrame.DataFrameProcess.MaskingKey;
+                        }
+                        else if (byteLength == 126)
+                        {
+                            frame.payloadIndex = 1;
+                            frame.process = DataFrame.DataFrameProcess.PayloadLen16;
+                        }
+                        else
+                        {
+                            frame.payloadIndex = 7;
+                            frame.process = DataFrame.DataFrameProcess.PayloadLen64;
+                        }
+
+                        break;
+
+                    case DataFrame.DataFrameProcess.PayloadLen16:
+
+                        frame.PayloadLength += buffer[i] << (8 * frame.payloadIndex);
+                        frame.payloadIndex--;
+
+                        if (frame.payloadIndex < 0)
+                        {
+                            frame.data = new byte[frame.PayloadLength];
+                            frame.process = DataFrame.DataFrameProcess.MaskingKey;
+                        }
+
+                        break;
+
+                    case DataFrame.DataFrameProcess.PayloadLen64:
+
+                        frame.PayloadLength += buffer[i] << (8 * frame.payloadIndex);
+                        frame.payloadIndex--;
+
+                        if (frame.payloadIndex < 0)
+                        {
+                            frame.data = new byte[frame.PayloadLength];
+                            frame.process = DataFrame.DataFrameProcess.MaskingKey;
+                        }
+
+                        break;
+
+                    case DataFrame.DataFrameProcess.MaskingKey:
+
+                        if (frame.isMasked)
+                        {
+                            frame.maskingKey[frame.maskingIndex] = buffer[i];
+                            frame.maskingIndex++;
+                            if (frame.maskingIndex >= frame.maskingKey.Length)
+                            {
+                                frame.process = DataFrame.DataFrameProcess.DATA;
+                            }
+                        }
+                        else
+                        {
+                            frame.process = DataFrame.DataFrameProcess.DATA;
+                        }
+
+                        break;
+
+                    case DataFrame.DataFrameProcess.DATA:
+
+
+                        if (frame.isMasked)
+                        {
+                            byte decodedByte = (byte)(buffer[i] ^ frame.maskingKey[frame.dataIndex % 4]);
+                            frame.data[frame.dataIndex] = decodedByte;
+                        }
+                        else
+                        {
+                            frame.data[frame.dataIndex] = buffer[i];
+                        }
+
+                        frame.dataIndex++;
+
+                        if (frame.dataIndex >= frame.PayloadLength)
+                        {
+                            //Receive Complete
+                            frame.process = DataFrame.DataFrameProcess.FIN_OPCode;
+
+                            if (!frame.hasContinuousData)
+                            {
+                                var message = CommunicationUtility.Deserialize(frame.data);
+
+                                frame.ResetFrame();
+
+                                return message;
+                            }
+                        }
+
+                        break;
+                }
+
+                //Clear Byte
+                buffer[i] = 0;
             }
-            return false;
+
+            return null;
         }
 
-        public void SetLength(int length)
-        {
 
+        public static byte[] EncodeRFC6455(DataFrame.OPCode opcode, byte[] byteData)
+        {
+            //Create WebSocket Frame
+            List<byte> sendBuffer = new List<byte>();
+            sendBuffer.Add((byte)(0x80 | (byte)opcode));
+            //No Mask
+            //Length
+            if (byteData.Length <= 0x7D)
+            {
+                sendBuffer.Add((byte)byteData.Length);
+            }
+            else if (byteData.Length <= 0x7FFF)
+            {
+                sendBuffer.Add(0x7E);
+                var lengtharr = BitConverter.GetBytes(byteData.Length);
+                //Only 2byte
+                for (int i = 1; i >= 0 ; i--)
+                    sendBuffer.Add(lengtharr[i]);
+            }
+            else
+            {
+                sendBuffer.Add(0x7F);
+                var lengtharr = BitConverter.GetBytes((long)byteData.Length);
+                for (int i = lengtharr.Length - 1; i >= 0; i--)
+                    sendBuffer.Add(lengtharr[i]);
+            }
+            //No Mask Key
+            foreach (var data in byteData)
+            {
+                sendBuffer.Add(data);
+            }
+
+            var result = sendBuffer.ToArray();
+            return result;
         }
     }
 
@@ -67,7 +287,7 @@ namespace UnityOnlineProjectServer.Connection
         public OPCode opcode;
 
         public bool hasContinuousData;
-        
+
         public bool isMasked;
         public int maskingIndex;
         public byte[] maskingKey;
@@ -104,6 +324,6 @@ namespace UnityOnlineProjectServer.Connection
 
             dataIndex = 0;
             data = null;
-    }
+        }
     }
 }

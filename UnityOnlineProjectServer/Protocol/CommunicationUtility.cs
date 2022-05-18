@@ -7,10 +7,6 @@ namespace UnityOnlineProjectServer.Protocol
 {
     public class CommunicationUtility
     {
-        public static void Decoding(byte[] receivedData)
-        {
-
-        }
 
         public static byte[] Serialize(CommunicationMessage<Dictionary<string, string>> message)
         {
@@ -18,7 +14,7 @@ namespace UnityOnlineProjectServer.Protocol
             {
                 var data = JsonConvert.SerializeObject(message);
 
-                return Encoding.ASCII.GetBytes(data);
+                return Encoding.UTF8.GetBytes(data);
             }
             catch (JsonSerializationException ex)
             {
@@ -42,9 +38,11 @@ namespace UnityOnlineProjectServer.Protocol
         {
             try
             {
-                var data = Encoding.ASCII.GetString(jsonByte);
+                var data = Encoding.UTF8.GetString(jsonByte);
 
-                return JsonConvert.DeserializeObject<CommunicationMessage<Dictionary<string, string>>>(data);
+                var result = JsonConvert.DeserializeObject<CommunicationMessage<Dictionary<string, string>>>(data);
+
+                return result;
             }  
             catch(JsonSerializationException ex)
             {

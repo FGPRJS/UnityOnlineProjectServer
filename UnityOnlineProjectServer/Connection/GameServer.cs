@@ -55,6 +55,9 @@ namespace UnityOnlineProjectServer.Connection
 
             IPHostEntry ipHostInfo = Dns.GetHostEntry(Dns.GetHostName());
             IPAddress ipAddress = ipHostInfo.AddressList[0];
+
+            Console.WriteLine("Server Start at " + ipAddress.ToString());
+
             listener = new TcpListener(ipAddress, Port);
 
             OpenServer();

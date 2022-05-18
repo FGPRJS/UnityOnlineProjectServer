@@ -66,5 +66,15 @@ namespace Server.Tests
 
             Assert.Equal(0x33, (byte)(val1 ^ val2));
         }
+
+        [Fact]
+        public void BitConverterTest()
+        {
+            long value = 9999999999999;
+
+            var bytes = BitConverter.GetBytes(value);
+
+            Assert.Equal(4, bytes.Length);
+        }
     }
 }

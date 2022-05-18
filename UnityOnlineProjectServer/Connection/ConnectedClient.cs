@@ -92,7 +92,7 @@ namespace UnityOnlineProjectServer.Connection
 
         void HeartbeatTickEventAction(object sender, EventArgs arg)
         {
-            SendData(Heartbeat.heartbeatMessageByteData);
+            SendPing();
         }
 
         void ReportNearbyObjPosition(object sender, EventArgs e)
@@ -102,13 +102,13 @@ namespace UnityOnlineProjectServer.Connection
             foreach (var obj in playerObject.GetNearbyObjects())
             {
                 var message = obj.CreateCurrentStatusMessage(MessageType.PawnPositionReport);
-                SendData(message);
+                SendTextData(message);
             }
         }
 
         void SendMessageRequestEventAction(object sender, CommunicationMessage<Dictionary<string, string>> message) 
         {
-            SendData(message);
+            SendTextData(message);
         }
 
         #endregion
@@ -120,6 +120,7 @@ namespace UnityOnlineProjectServer.Connection
             try
             {
                 socketStatus = SocketStatus.HandShaking;
+                Console.WriteLine("Start Handshaking");
 
                 stream.BeginRead(
                     receivedData.buffer,
@@ -165,9 +166,14 @@ namespace UnityOnlineProjectServer.Connection
                         "Connection: Upgrade\r\n" +
                         "Sec-WebSocket-Accept: " + websocketKeyReplySHA1Base64 + "\r\n\r\n");
 
-                    await SendData(response);
+                    await stream.WriteAsync(
+                        response,
+                        0,
+                        response.Length,
+                        CancellationToken.None);
 
                     socketStatus = SocketStatus.Connected;
+                    Console.WriteLine("Hanshaking Complete");
 
                     BeginReceive();
                 }
@@ -179,7 +185,7 @@ namespace UnityOnlineProjectServer.Connection
                     byte[] response = Encoding.UTF8.GetBytes(
                         "HTTP/1.1 400 Bad Request\r\n");
 
-                    await SendData(response);
+                    SendTextData(response);
 
                     Console.WriteLine("Handshaking Failed.");
                     ShutDownRequest();
@@ -205,11 +211,7 @@ namespace UnityOnlineProjectServer.Connection
                     DataReceivedCallback,
                     client);
             }
-            catch(NullReferenceException ne)
-            {
-                Console.WriteLine("ClientSocket Lost");
-            }
-            catch(SocketException se)
+            catch(Exception ne)
             {
                 Console.WriteLine("Socket is not available. Shutdown Client.");
                 ShutDownRequest();
@@ -225,9 +227,10 @@ namespace UnityOnlineProjectServer.Connection
 
                 if (bytesRead > 0)
                 {
-                    DecodeFrameRFC6455(bytesRead);
+                    var receivedMessage = receivedData.DecodeFrameRFC6455(bytesRead);
+                    Console.WriteLine("Receive : " + JsonConvert.SerializeObject(receivedMessage));
+                    ProcessMessage(receivedMessage);
 
-                    heartbeat.ResetTimer();
                     BeginReceive();
                 }
                 else
@@ -235,6 +238,8 @@ namespace UnityOnlineProjectServer.Connection
                     Console.WriteLine("Client Closed.");
                     ShutDownRequest();
                 }
+
+                heartbeat.ResetTimer();
             }
             catch (NullReferenceException)
             {
@@ -250,161 +255,11 @@ namespace UnityOnlineProjectServer.Connection
 
         #region Process Received Data Frame
 
-        private void DecodeFrameRFC6455(int bytesRead)
-        {
-            for(var i = 0; i < bytesRead; i++)
-            {
-                var data = receivedData.buffer[i];
-                bool[] dataBitArr;
-
-                switch (receivedData.frame.process)
-                {
-                    case DataFrame.DataFrameProcess.None:
-                    case DataFrame.DataFrameProcess.FIN_OPCode:
-
-                        dataBitArr = BitByte.BytetoBitArray(data);
-                        //FINBit = 1
-                        if(dataBitArr[0])
-                        {
-                            //OPCode
-                            receivedData.frame.opcode = (DataFrame.OPCode)BitByte.PartofBitArraytoByte(dataBitArr, 4);
-                            if(Enum.IsDefined(typeof(DataFrame.OPCode), receivedData.frame.opcode))
-                            {
-                                receivedData.frame.process = DataFrame.DataFrameProcess.MASK_PayloadLen;
-                                receivedData.frame.hasContinuousData = false;
-                            }
-                            else
-                            {
-                                receivedData.frame.ResetFrame();
-                            }
-                        }
-                        //FINBit = 0 -> isContinuous?
-                        else
-                        {
-                            receivedData.frame.hasContinuousData = true;
-                        }
-
-                        break;
-
-                    case DataFrame.DataFrameProcess.MASK_PayloadLen:
-
-                        dataBitArr = BitByte.BytetoBitArray(data);
-                        //MASKBit
-                        receivedData.frame.isMasked = dataBitArr[0];
-                        if (receivedData.frame.isMasked)
-                        {
-                            receivedData.frame.maskingKey = new byte[4];
-                        }
-
-
-                        //Length Byte(Part of)
-                        var byteLength = BitByte.PartofBitArraytoByte(dataBitArr, 1);
-
-                        if (byteLength < 126)
-                        {
-                            receivedData.frame.PayloadLength = byteLength;
-                            receivedData.frame.data = new byte[byteLength];
-                            receivedData.frame.process = DataFrame.DataFrameProcess.MaskingKey;
-                        }
-                        else if(byteLength == 126)
-                        {
-                            receivedData.frame.payloadIndex = 1;
-                            receivedData.frame.process = DataFrame.DataFrameProcess.PayloadLen16;
-                        }
-                        else
-                        {
-                            receivedData.frame.payloadIndex = 7;
-                            receivedData.frame.process = DataFrame.DataFrameProcess.PayloadLen64;
-                        }
-
-                        break;
-
-                    case DataFrame.DataFrameProcess.PayloadLen16:
-
-                        receivedData.frame.PayloadLength += receivedData.buffer[i] << (8 * receivedData.frame.payloadIndex);
-                        receivedData.frame.payloadIndex--;
-
-                        if (receivedData.frame.payloadIndex < 0)
-                        {
-                            receivedData.frame.data = new byte[receivedData.frame.PayloadLength];
-                            receivedData.frame.process = DataFrame.DataFrameProcess.MaskingKey;
-                        }
-
-                        break;
-
-                    case DataFrame.DataFrameProcess.PayloadLen64:
-
-                        receivedData.frame.PayloadLength += receivedData.buffer[i] << (8 * receivedData.frame.payloadIndex);
-                        receivedData.frame.payloadIndex--;
-
-                        if (receivedData.frame.payloadIndex < 0)
-                        {
-                            receivedData.frame.data = new byte[receivedData.frame.PayloadLength];
-                            receivedData.frame.process = DataFrame.DataFrameProcess.MaskingKey;
-                        }
-
-                        break;
-
-                    case DataFrame.DataFrameProcess.MaskingKey:
-
-                        if (receivedData.frame.isMasked)
-                        {
-                            receivedData.frame.maskingKey[receivedData.frame.maskingIndex] = receivedData.buffer[i];
-                            receivedData.frame.maskingIndex++;
-                            if (receivedData.frame.maskingIndex >= receivedData.frame.maskingKey.Length)
-                            {
-                                receivedData.frame.process = DataFrame.DataFrameProcess.DATA;
-                            }
-                        }
-                        else
-                        {
-                            receivedData.frame.process = DataFrame.DataFrameProcess.DATA;
-                        }
-
-                        break;
-
-                    case DataFrame.DataFrameProcess.DATA:
-
-                        
-                        if (receivedData.frame.isMasked)
-                        {
-                            byte decodedByte = (byte)(receivedData.buffer[i] ^ receivedData.frame.maskingKey[receivedData.frame.dataIndex % 4]);
-                            receivedData.frame.data[receivedData.frame.dataIndex] = decodedByte;
-                        }
-                        else
-                        {
-                            receivedData.frame.data[receivedData.frame.dataIndex] = receivedData.buffer[i];
-                        }
-
-                        receivedData.frame.dataIndex++;
-
-                        if (receivedData.frame.dataIndex >= receivedData.frame.PayloadLength)
-                        {
-                            //Receive Complete
-                            receivedData.frame.process = DataFrame.DataFrameProcess.FIN_OPCode;
-
-                            if (!receivedData.frame.hasContinuousData)
-                            {
-                                //Temp
-                                Console.WriteLine(Encoding.UTF8.GetString(receivedData.frame.data));
-
-
-                                receivedData.frame.ResetFrame();
-                            }
-                        }
-
-                        break;
-                }
-
-                //Clear Byte
-                receivedData.buffer[i] = 0;
-            }
-        }
-
-
         private void ProcessMessage(CommunicationMessage<Dictionary<string, string>> message)
         {
             MessageType messageType;
+
+            if (message == null) return;
 
             try
             {
@@ -418,12 +273,22 @@ namespace UnityOnlineProjectServer.Connection
 
             switch (messageType)
             {
-                case MessageType.HeartBeatRequest:
+                case MessageType.Ping:
 
-                    if (message.header.ACK == (int)ACK.ACK) return;
+                    SendPong();
 
-                    //Just Reply
-                    SendACKMessage(message);
+                    break;
+
+                case MessageType.Pong:
+
+                    //do nothing
+
+                    break;
+
+                case MessageType.Close:
+
+                    ShutDownRequest();
+
                     break;
 
                 case MessageType.LoginRequest:
@@ -431,7 +296,7 @@ namespace UnityOnlineProjectServer.Connection
                     clientName = message.body.Any["UserName"];
                     message.header.ACK = (int)ACK.ACK;
 
-                    SendData(message);
+                    SendACKMessage(message);
 
                     break;
 
@@ -498,25 +363,25 @@ namespace UnityOnlineProjectServer.Connection
         {
             replyMessage.header.ACK = (int)ACK.NACK;
             replyMessage.header.Reason = reason;
-            SendData(replyMessage);
+            SendTextData(replyMessage);
         }
 
         void SendACKMessage(CommunicationMessage<Dictionary<string, string>> replyMessage)
         {
             replyMessage.header.ACK = (int)ACK.ACK;
-            SendData(replyMessage);
+            SendTextData(replyMessage);
         }
 
         #endregion
 
         #region Send Data
-        public void SendData(CommunicationMessage<Dictionary<string,string>> message)
+        public void SendTextData(CommunicationMessage<Dictionary<string,string>> message)
         {
             try
             {
                 var byteData = CommunicationUtility.Serialize(message);
-
-                SendData(byteData);
+                Console.WriteLine("Send : " + JsonConvert.SerializeObject(message));
+                SendTextData(byteData);
             }
             catch(Exception ex)
             {
@@ -524,21 +389,63 @@ namespace UnityOnlineProjectServer.Connection
             }
         }
 
-        public async Task SendData(byte[] byteData)
+        public void SendTextData(byte[] byteData)
         {
             try
             {
-                Console.WriteLine("Send data to client.");
+                Console.WriteLine($"Send {byteData.Length} byte(s) ByteData to client.");
 
-                await stream.WriteAsync(
-                    byteData,
+                var result = DataBuffer.EncodeRFC6455(DataFrame.OPCode.Text, byteData);
+
+                stream.WriteAsync(
+                    result,
                     0,
-                    byteData.Length,
+                    result.Length,
                     CancellationToken.None);
             }
             catch (Exception ex)
             {
                 Console.WriteLine("Cannot send Data. Reason : " + ex.Message);
+            }
+        }
+
+        public async Task SendPing()
+        {
+            try
+            {
+                Console.WriteLine("Send PING");
+
+                var result = DataBuffer.EncodeRFC6455(DataFrame.OPCode.Ping, new byte[0]);
+
+                await stream.WriteAsync(
+                    result,
+                    0,
+                    result.Length,
+                    CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Cannot send PING. Reason : " + ex.Message);
+            }
+        }
+
+        public async Task SendPong()
+        {
+            try
+            {
+                Console.WriteLine("Send PONG");
+
+                var result = DataBuffer.EncodeRFC6455(DataFrame.OPCode.Pong, new byte[0]);
+
+                await stream.WriteAsync(
+                    result,
+                    0,
+                    result.Length,
+                    CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Cannot send PONG. Reason : " + ex.Message);
             }
         }
 

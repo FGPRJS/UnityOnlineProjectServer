@@ -5,36 +5,118 @@ using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using UnityOnlineProjectServer.Connection;
+using UnityOnlineProjectServer.Protocol;
 using Xunit;
+using static UnityOnlineProjectServer.Content.Pawn;
 
 namespace Server.Tests
 {
     public class ServerTest
     {
-        [Fact]
-        public void ConnectAndDisconnect()
+        GameServer server;
+        ClientWebSocket client;
+
+        private async Task StartandConnect()
         {
-            AutoResetEvent breaker = new AutoResetEvent(false);
-
-            GameServer server = new GameServer();
-
+            server = new GameServer();
             server.StartLocal();
 
-            Socket client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            await Connect();
+        }
 
-            IPAddress address = IPAddress.Parse("127.0.0.1");
-            IPEndPoint endPoint = new IPEndPoint(address, 8080);
-            client.BeginConnect(endPoint, 
-                (ar) => {
-                    client.EndConnect(ar);
-                    breaker.Set();
-                }, client);
+        private async Task Connect()
+        {
+            client = new ClientWebSocket();
 
-            breaker.WaitOne();
+            UriBuilder uriBuilder = new UriBuilder("ws", "127.0.0.1", 8080);
+            await client.ConnectAsync(uriBuilder.Uri, CancellationToken.None);
+        }
 
-            client.Shutdown(SocketShutdown.Both);
-            client.Close();
+        [Fact]
+        public async void ConnectAndDisconnect()
+        {
+            await StartandConnect();
+
+            await client.CloseOutputAsync(WebSocketCloseStatus.NormalClosure,"", CancellationToken.None);
+        }
+
+        [Fact]
+        public async void ConnectAndLoginRequest()
+        {
+            await StartandConnect();
+
+            ArraySegment<byte> buffer = new ArraySegment<byte>(new byte[1024]);
+            WebSocketReceiveResult result = null;
+
+            _ = client.SendAsync(CommunicationUtility.Serialize(new CommunicationMessage<Dictionary<string, string>>()
+            {
+                header = new Header()
+                {
+                    MessageName = MessageType.LoginRequest.ToString(),
+                },
+                body = new Body<Dictionary<string, string>>()
+                {
+                    Any = new Dictionary<string, string>()
+                    {
+                        ["UserName"] = "TESTER"
+                    }
+                }
+            }), WebSocketMessageType.Text, true, CancellationToken.None);
+
+            do
+            {
+                result = await client.ReceiveAsync(buffer, CancellationToken.None);
+            }
+            while (!result.EndOfMessage);
+            
+
+            var message = CommunicationUtility.Deserialize(buffer.Array);
+
+            Assert.NotNull(message);
+        }
+
+        [Fact]
+        public async void SendPawnRequest()
+        {
+            await StartandConnect();
+
+            ArraySegment<byte> buffer = new ArraySegment<byte>(new byte[1024]);
+            WebSocketReceiveResult result = null;
+
+            _ = client.SendAsync(CommunicationUtility.Serialize(new CommunicationMessage<Dictionary<string, string>>()
+            {
+                header = new Header()
+                {
+                    MessageName = MessageType.PawnSpawnRequest.ToString(),
+                },
+                body = new Body<Dictionary<string, string>>()
+                {
+                    Any = new Dictionary<string, string>()
+                    {
+                        ["ObjectType"] = PawnType.Tank.ToString()
+                    }
+                }
+            }), WebSocketMessageType.Text, true, CancellationToken.None);
+
+            bool isRun = true;
+
+            while (isRun)
+            {
+                do
+                {
+                    result = await client.ReceiveAsync(buffer, CancellationToken.None);
+                }
+                while (!result.EndOfMessage);
+
+                var message = CommunicationUtility.Deserialize(buffer.Array);
+
+                if (message != null)
+                {
+                    isRun = false;
+                }
+            }
         }
     }
 }
