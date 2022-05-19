@@ -21,6 +21,7 @@ namespace UnityOnlineProjectServer.Content.GameObject.Implements
             Green,
             Blue
         }
+        public TankType subType;
         public Tank(long id) : base(id)
         {
             isDetector = true;
@@ -30,6 +31,31 @@ namespace UnityOnlineProjectServer.Content.GameObject.Implements
         ~Tank()
         {
             
+        }
+
+        public override CommunicationMessage<Dictionary<string, string>> CreateObjectInfoMessage(MessageType messageType)
+        {
+            var message = new CommunicationMessage<Dictionary<string, string>>()
+            {
+                header = new Header()
+                {
+                    MessageName = messageType.ToString()
+                },
+                body = new Body<Dictionary<string, string>>()
+                {
+                    Any = new Dictionary<string, string>()
+                    {
+                        ["ID"] = id.ToString(),
+                        ["Velocity"] = Velocity.ToString(),
+                        ["ObjectType"] = PawnType.Tank.ToString(),
+                        ["ObjectSubType"] = subType.ToString(),
+                        ["Position"] = Position.ToString(),
+                        ["Quaternion"] = Rotation.ToString()
+                    }
+                }
+            };
+
+            return message;
         }
 
         public override CommunicationMessage<Dictionary<string, string>> CreateCurrentStatusMessage(MessageType messageType)
@@ -45,6 +71,7 @@ namespace UnityOnlineProjectServer.Content.GameObject.Implements
                     Any = new Dictionary<string, string>()
                     {
                         ["ID"] = id.ToString(),
+                        ["Velocity"] = Velocity.ToString(),
                         ["Position"] = Position.ToString(),
                         ["Quaternion"] = Rotation.ToString(),
                         ["TowerQuaternion"] = TowerRotation.ToString(),
@@ -62,6 +89,9 @@ namespace UnityOnlineProjectServer.Content.GameObject.Implements
             var rawPositionData = message.body.Any["Position"];
             var readedPositionData = NumericParser.ParseVector(rawPositionData);
 
+            var rawVelocityData = message.body.Any["Velocity"];
+            var readedVelocityData = NumericParser.ParseVector(rawVelocityData);
+
             var rawRotationData = message.body.Any["Quaternion"];
             var readedRotationData = NumericParser.ParseQuaternion(rawRotationData);
 
@@ -71,6 +101,7 @@ namespace UnityOnlineProjectServer.Content.GameObject.Implements
             var rawCannonRotationData = message.body.Any["CannonQuaternion"];
             var readedCannonRotationData = NumericParser.ParseQuaternion(rawCannonRotationData);
 
+            Velocity = readedVelocityData;
             Rotation = readedRotationData;
             Position = readedPositionData;
             TowerRotation = readedTowerRotationData;

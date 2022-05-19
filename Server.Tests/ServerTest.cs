@@ -74,7 +74,7 @@ namespace Server.Tests
 
             var message = CommunicationUtility.Deserialize(buffer.Array);
 
-            Assert.NotNull(message);
+            Assert.Equal("TESTER", message.body.Any["UserName"]);
         }
 
         [Fact]
@@ -89,7 +89,7 @@ namespace Server.Tests
             {
                 header = new Header()
                 {
-                    MessageName = MessageType.PawnSpawnRequest.ToString(),
+                    MessageName = MessageType.GameObjectSpawnRequest.ToString(),
                 },
                 body = new Body<Dictionary<string, string>>()
                 {

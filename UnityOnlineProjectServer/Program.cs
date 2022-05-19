@@ -31,7 +31,7 @@ namespace UnityOnlineProjectServer
                     case "quit":
 
                         isRun = false;
-                        server.ShutDownAllClients();
+                        server.ShutDownServer();
 
                         break;
 

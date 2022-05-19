@@ -7,8 +7,6 @@ using System.Numerics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using UnityOnlineProjectServer.Connection.TickTasking;
-using UnityOnlineProjectServer.Content;
 using UnityOnlineProjectServer.Content.Map;
 
 namespace UnityOnlineProjectServer.Connection
@@ -18,34 +16,23 @@ namespace UnityOnlineProjectServer.Connection
         public bool isRun;
         public TcpListener listener;
 
-        private readonly long clientCount = 100;
-        private ConcurrentDictionary<long, ConnectedClient> clients;
-
-        private readonly long gameFieldCount = 1;
-        private ConcurrentDictionary<long, GameField> gameFields;
-
         public int Port = 8080;
+
+        public ConcurrentDictionary<ConnectedClient, bool> lobby;
+
+        public static long ChannelCount = 1;
+        public ConcurrentDictionary<long, GameChannel> channels;
 
         public GameServer()
         {
-            //Create Clients
-            clients = new ConcurrentDictionary<long, ConnectedClient>();
+            lobby = new ConcurrentDictionary<ConnectedClient, bool>();
+            channels = new ConcurrentDictionary<long, GameChannel>();
 
-            for(long i = 0; i < clientCount; i++)
+            for(long i = 0; i < ChannelCount; i++)
             {
-                var client = new ConnectedClient(i);
-                client.ShutdownRequestEvent += (id) => { ShutDownClient(id); };
-                clients.TryAdd(i, client);
-            }
+                var newChannel = new GameChannel();
 
-            //Create Maps
-            gameFields = new ConcurrentDictionary<long, GameField>();
-            
-            for(long i = 0; i < gameFieldCount; i++)
-            {
-                var map = new GameField();
-                map.isEnterable = true;
-                gameFields.TryAdd(i, map);
+                channels.TryAdd(i, newChannel);
             }
         }
 
@@ -82,7 +69,6 @@ namespace UnityOnlineProjectServer.Connection
 
                 listener.BeginAcceptTcpClient(ClientAccepted, listener);
                 isRun = true;
-                InitializeGlobalServerTask();
             }
             catch (Exception ex)
             {
@@ -95,134 +81,60 @@ namespace UnityOnlineProjectServer.Connection
             Console.WriteLine("Connecting client detected");
 
             // Get the socket that handles the client request.  
-            var client = listener.EndAcceptTcpClient(ar);
+            var clientSocket = listener.EndAcceptTcpClient(ar);
+
             // Wait for other Client
             listener.BeginAcceptTcpClient(ClientAccepted, listener);
 
-            GameField availableField = null;
+            //Create Client
+            var client = new ConnectedClient();
+            client.Initialize(clientSocket);
+            client.HandshakeCompleteEvent += FindChannelForClient;
 
-            //Find Map
-            for (long mapIndex = 0; mapIndex < gameFields.Count; mapIndex++)
-            {
-                var map = gameFields[mapIndex];
-
-                if (map.isEnterable)
-                {
-                    availableField = map;
-                    break;
-                }
-            }
-
-            //Find Client
-            for (long i = 0; i < clients.Count; i++)
-            {
-                var connectedClient = clients[i];
-
-                if (connectedClient != null)
-                {
-                    clients[i].Initialize(client);
-                    clients[i].currentField = availableField;
-                    return;
-                }
-            }
-
-            //Client Full. Cannot Connect
+            //Keep client in lobby
+            lobby.TryAdd(client, true);
         }
 
-        #region Tick Task
-
-        #region Global Tick Task
-
-        private CancellationTokenSource _globalServerTaskCancellationTokenSource;
-        private CancellationToken _globalServerTaskCancellationToken;
-        private Task _globalServerTask;
-        private int _tickInterval = 100;
-
-        private void InitializeGlobalServerTask()
+        private void FindChannelForClient(object sender, EventArgs e)
         {
-            if (_globalServerTaskCancellationTokenSource != null)
-            {
-                CancelGlobalServerTask();
-            }
-            else
-            {
-                _globalServerTaskCancellationTokenSource = new CancellationTokenSource();
-                _globalServerTaskCancellationToken = _globalServerTaskCancellationTokenSource.Token;
-            }
+            var client = (ConnectedClient)sender;
+            bool dummy;
 
-            _globalServerTask = new Task(new Action(async () =>
+            client.HandshakeCompleteEvent -= FindChannelForClient;
+
+            lobby.TryRemove(client, out dummy);
+            foreach(var channel in channels.Values)
             {
-                while (isRun)
+                var result = channel.AddClient(client);
+                if (!result)
                 {
-                    await Task.Delay(_tickInterval);
-                    
-                    for (long i = 0; i < clientCount; i++)
-                    {
-                        var client = clients[i];
-                        //CheckHeartbeat
-                        client?.heartbeat?.CountTick(_tickInterval);
-                        //CheckPositionReport
-                        client?.playerObject?.positionReport?.CountTick(_tickInterval);
-                    }
+                    //Cannot enter to channel;
                 }
-            }), _globalServerTaskCancellationToken);
-
-            _globalServerTask.Start();
-        }
-
-        private void CancelGlobalServerTask()
-        {
-            try
-            {
-                //Cancel heartbeat. if already cancellationrequested, cancel
-                _globalServerTaskCancellationToken.ThrowIfCancellationRequested();
-
-                _globalServerTaskCancellationTokenSource.Cancel();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Cancel GlobalTask is already requested.");
             }
         }
-
-        #endregion // Global Tick Task
-
-        
-        #endregion // TickTask
 
         #region ShutDown
-        public void ShutDownClient(long id)
-        {
-            var client = clients[id];
 
-            if (client.client != null)
-            {
-                client.client.Close();
-                client.client = null;
-            }
-        }
-
-        public void ShutDownAllClients()
+        public void ShutdownAllChannels()
         {
-            Console.WriteLine("ShutDown clients...");
+            Console.WriteLine("ShutDown channels...");
 
             //All ShutDown
-            for (long i = 0; i < clients.Count; i++)
+            foreach(var channel in channels.Values)
             {
-                ShutDownClient(clients[i].id);
+                channel.ShutDownChannel();
             }
 
-            Console.WriteLine("ShutDown clients complete!");
+            Console.WriteLine("ShutDown channels complete!");
         }
 
         public void ShutDownServer()
         {
             Console.WriteLine("Shutdown server...");
 
-            ShutDownAllClients();
+            ShutdownAllChannels();
 
             isRun = false;
-            CancelGlobalServerTask();
 
             //Server ShutDown
             listener.Stop();

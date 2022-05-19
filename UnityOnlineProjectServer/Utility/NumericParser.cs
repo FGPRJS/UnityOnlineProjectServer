@@ -11,7 +11,7 @@ namespace UnityOnlineProjectServer.Utility
     {
         public static Vector3 ParseVector(string stringVector)
         {
-            var regexVector = Regex.Replace(stringVector, "[^0-9,]", "");
+            var regexVector = Regex.Replace(stringVector, "[^0-9,.-]", "");
 
             var parseVector = regexVector.Split(',');
 
@@ -25,7 +25,7 @@ namespace UnityOnlineProjectServer.Utility
 
         public static Quaternion ParseQuaternion(string stringQuaternion)
         {
-            var regexQuaternion = Regex.Replace(stringQuaternion, "[^0-9, ]", "");
+            var regexQuaternion = Regex.Replace(stringQuaternion, "[^0-9 .-]", "");
 
             var parseQuaternion = regexQuaternion.Split(' ');
 

@@ -1,7 +1,5 @@
 ﻿using Newtonsoft.Json;
 using System;
-using System.Collections;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
@@ -11,11 +9,10 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using UnityOnlineProjectServer.Connection.TickTasking;
 using UnityOnlineProjectServer.Content;
-using UnityOnlineProjectServer.Content.Map;
+using UnityOnlineProjectServer.Content.GameObject.Implements;
+using UnityOnlineProjectServer.Content.TickTasking;
 using UnityOnlineProjectServer.Protocol;
-using UnityOnlineProjectServer.Utility;
 using static UnityOnlineProjectServer.Content.GameObject.Implements.Tank;
 using static UnityOnlineProjectServer.Content.Pawn;
 
@@ -23,8 +20,6 @@ namespace UnityOnlineProjectServer.Connection
 {
     public class ConnectedClient
     {
-        public GameField currentField;
-
         public enum SocketStatus
         {
             Disconnected,
@@ -33,27 +28,21 @@ namespace UnityOnlineProjectServer.Connection
         }
         public SocketStatus socketStatus;
         
-        public TcpClient client;
+        public TcpClient socket;
         public NetworkStream stream;
         public DataBuffer receivedData;
 
         public string clientName;
 
         public Heartbeat heartbeat;
-        public NearbyObjPositionReport nearbyObjPositionReport;
 
-        public Pawn playerObject;
+        public Pawn PlayerObject;
 
-        public readonly long id;
+        public long id;
+        public EventHandler PlayerObjectAssignedEvent;
+        public EventHandler HandshakeCompleteEvent;
+        public EventHandler<long> ShutdownRequestEvent;
 
-        public event ShutdownRequest ShutdownRequestEvent;
-        public delegate void ShutdownRequest(long id);
-
-
-        public ConnectedClient(long id)
-        {
-            this.id = id;
-        }
 
         public void Initialize(TcpClient client)
         {
@@ -62,12 +51,12 @@ namespace UnityOnlineProjectServer.Connection
             receivedData.Initialize();
 
             //Initialize Socket
-            this.client = client;
-            this.client.ReceiveBufferSize = DataBuffer.BufferSize;
-            this.client.SendBufferSize = DataBuffer.BufferSize;
+            socket = client;
+            socket.ReceiveBufferSize = DataBuffer.BufferSize;
+            socket.SendBufferSize = DataBuffer.BufferSize;
 
             //Initialize Socket stream
-            stream = this.client.GetStream();
+            stream = socket.GetStream();
 
             socketStatus = SocketStatus.Disconnected;
 
@@ -76,12 +65,9 @@ namespace UnityOnlineProjectServer.Connection
             heartbeat.TimeoutEvent += HeartbeatTimeOutEventAction;
             heartbeat.TickEvent += HeartbeatTickEventAction;
 
-            //NearbyObjPositionReport
-            nearbyObjPositionReport = new NearbyObjPositionReport();
-            nearbyObjPositionReport.TickEvent += ReportNearbyObjPosition;
-
             HandShaking();
         }
+
 
         #region Event Action
 
@@ -95,21 +81,7 @@ namespace UnityOnlineProjectServer.Connection
             SendPing();
         }
 
-        void ReportNearbyObjPosition(object sender, EventArgs e)
-        {
-            if (playerObject == null) return;
-
-            foreach (var obj in playerObject.GetNearbyObjects())
-            {
-                var message = obj.CreateCurrentStatusMessage(MessageType.PawnPositionReport);
-                SendTextData(message);
-            }
-        }
-
-        void SendMessageRequestEventAction(object sender, CommunicationMessage<Dictionary<string, string>> message) 
-        {
-            SendTextData(message);
-        }
+        
 
         #endregion
 
@@ -127,7 +99,7 @@ namespace UnityOnlineProjectServer.Connection
                     0,
                     DataBuffer.BufferSize,
                     HandShakingCallBack,
-                    client);
+                    socket);
             }
             catch (NullReferenceException ne)
             {
@@ -204,12 +176,12 @@ namespace UnityOnlineProjectServer.Connection
         {
             try
             {
-                stream.BeginRead(
-                    receivedData.buffer,
+                stream?.BeginRead(
+                    receivedData?.buffer,
                     0,
                     DataBuffer.BufferSize,
                     DataReceivedCallback,
-                    client);
+                    socket);
             }
             catch(Exception ne)
             {
@@ -239,7 +211,7 @@ namespace UnityOnlineProjectServer.Connection
                     ShutDownRequest();
                 }
 
-                heartbeat.ResetTimer();
+                heartbeat?.ResetTimer();
             }
             catch (NullReferenceException)
             {
@@ -296,16 +268,17 @@ namespace UnityOnlineProjectServer.Connection
                     clientName = message.body.Any["UserName"];
                     message.header.ACK = (int)ACK.ACK;
 
+                    HandshakeCompleteEvent?.Invoke(this, EventArgs.Empty);
                     SendACKMessage(message);
 
                     break;
 
-                case MessageType.PawnSpawnRequest:
+                case MessageType.GameObjectSpawnRequest:
 
                     Vector3 position = new Vector3(
-                        RandomManager.GetRandomWithfloatingPoint(100, 800),
+                        RandomManager.GetRandomWithfloatingPoint(790, 800),
                         20,
-                        RandomManager.GetRandomWithfloatingPoint(100, 800));
+                        RandomManager.GetRandomWithfloatingPoint(790, 800));
 
                     Quaternion rotation = Quaternion.CreateFromYawPitchRoll(
                         0,
@@ -320,23 +293,26 @@ namespace UnityOnlineProjectServer.Connection
                     switch (objectType)
                     {
                         case PawnType.Tank:
-
                             var values = Enum.GetValues(typeof(TankType));
                             var subtype = values.GetValue(RandomManager.GetIntegerRandom(0, values.Length));
                             subobjectType = subtype.ToString();
 
+                            //Create Object
+                            var newTank = new Tank(id);
+                            newTank.subType = (TankType)subtype;
+                            newTank.Position = position;
+                            newTank.Rotation = rotation;
+
+                            PlayerObject = newTank;
+
                             break;
                     }
-
-                    //Create Object
-                    playerObject = currentField.CreatePawn(objectType, position);
-                    playerObject.Rotation = rotation;
 
                     message.body = new Body<Dictionary<string, string>>()
                     {
                         Any = new Dictionary<string, string>()
                         {
-                            ["ID"] = playerObject.id.ToString(),
+                            ["ID"] = PlayerObject.id.ToString(),
                             ["ObjectType"] = message.body.Any["ObjectType"],
                             ["ObjectSubType"] = subobjectType,
                             ["Position"] = position.ToString(),
@@ -346,11 +322,13 @@ namespace UnityOnlineProjectServer.Connection
 
                     SendACKMessage(message);
 
+                    PlayerObjectAssignedEvent?.Invoke(this, EventArgs.Empty);
+
                     break;
 
-                case MessageType.PawnPositionReport:
+                case MessageType.TankPositionReport:
 
-                    playerObject.ApplyCurrentStatusMessage(message);
+                    PlayerObject.ApplyCurrentStatusMessage(message);
 
                     break;
             }
@@ -461,26 +439,11 @@ namespace UnityOnlineProjectServer.Connection
                 heartbeat = null;
             }
 
-            if (playerObject != null)
-            {
-                //Remove Controlling object
-                playerObject.SendMessageRequestEvent -= SendMessageRequestEventAction;
-
-                currentField.RemovePawn(playerObject);
-                playerObject = null;
-            }
-
-            if(nearbyObjPositionReport != null)
-            {
-                nearbyObjPositionReport.TickEvent -= ReportNearbyObjPosition;
-                nearbyObjPositionReport = null;
-            }
-
             receivedData = null;
 
-            client = null;
+            socket = null;
 
-            ShutdownRequestEvent.Invoke(id);
+            ShutdownRequestEvent?.Invoke(this, id);
         }
     }
 }

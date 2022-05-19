@@ -70,11 +70,11 @@ namespace Server.Tests
         [Fact]
         public void BitConverterTest()
         {
-            long value = 9999999999999;
+            long value = 9999;
 
             var bytes = BitConverter.GetBytes(value);
 
-            Assert.Equal(4, bytes.Length);
+            Assert.Equal(8, bytes.Length);
         }
     }
 }

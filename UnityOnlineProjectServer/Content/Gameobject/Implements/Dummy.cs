@@ -22,5 +22,10 @@ namespace UnityOnlineProjectServer.Content.GameObject.Implements
         {
             return null;
         }
+
+        public override CommunicationMessage<Dictionary<string, string>> CreateObjectInfoMessage(MessageType messageType)
+        {
+            throw null;
+        }
     }
 }

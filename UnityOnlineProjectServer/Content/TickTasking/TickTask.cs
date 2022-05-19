@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace UnityOnlineProjectServer.Connection
+namespace UnityOnlineProjectServer.Content.TickTasking
 {
     public abstract class TickTask
     {

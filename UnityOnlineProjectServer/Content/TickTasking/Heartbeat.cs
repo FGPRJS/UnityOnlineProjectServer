@@ -4,7 +4,7 @@ using System.Text;
 using System.Threading.Tasks;
 using UnityOnlineProjectServer.Protocol;
 
-namespace UnityOnlineProjectServer.Connection
+namespace UnityOnlineProjectServer.Content.TickTasking
 {
     public class Heartbeat : TickTask
     {
