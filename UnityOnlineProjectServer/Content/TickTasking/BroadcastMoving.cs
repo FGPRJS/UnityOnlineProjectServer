@@ -5,9 +5,9 @@ using UnityOnlineProjectServer.Connection;
 
 namespace UnityOnlineProjectServer.Content.TickTasking
 {
-    public class BroadcastLocation : TickTask
+    public class BroadcastMoving : TickTask
     {
-        public BroadcastLocation()
+        public BroadcastMoving()
         {
             _interval = 100;
             _maxCount = 999;

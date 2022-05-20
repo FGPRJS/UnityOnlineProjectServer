@@ -22,7 +22,6 @@ namespace UnityOnlineProjectServer.Content
         public float sight;
 
         public Vector3 Position = Vector3.Zero;
-        public Vector3 Velocity;
         public Quaternion Rotation;
 
         public Pawn(long id)
@@ -35,6 +34,9 @@ namespace UnityOnlineProjectServer.Content
 
         public abstract CommunicationMessage<Dictionary<string, string>> CreateCurrentStatusMessage(MessageType messageType);
 
+        public abstract CommunicationMessage<Dictionary<string, string>> CreateCurrentMovingStatusMessage(MessageType messageType);
+
+        public abstract void ApplyCurrentMovingStatusMessage(CommunicationMessage<Dictionary<string, string>> message);
         public abstract void ApplyCurrentStatusMessage(CommunicationMessage<Dictionary<string, string>> message);
     }
 }

@@ -13,9 +13,19 @@ namespace UnityOnlineProjectServer.Content.GameObject.Implements
             sight = 1;
         }
 
+        public override void ApplyCurrentMovingStatusMessage(CommunicationMessage<Dictionary<string, string>> message)
+        {
+            throw new NotImplementedException();
+        }
+
         public override void ApplyCurrentStatusMessage(CommunicationMessage<Dictionary<string, string>> message)
         {
             return;
+        }
+
+        public override CommunicationMessage<Dictionary<string, string>> CreateCurrentMovingStatusMessage(MessageType messageType)
+        {
+            throw new NotImplementedException();
         }
 
         public override CommunicationMessage<Dictionary<string, string>> CreateCurrentStatusMessage(MessageType messageType)

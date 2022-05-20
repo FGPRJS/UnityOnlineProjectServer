@@ -16,7 +16,8 @@ namespace UnityOnlineProjectServer.Content.Map
         private static long clientCount = 16;
         private ConcurrentDictionary<long, ConnectedClient> clients;
 
-        public BroadcastLocation broadcastLocation;
+        public BroadcastMoving broadcastMoving;
+        public BroadcastPosition broadcastPosition;
 
         public enum ChannelStatus
         {
@@ -34,8 +35,10 @@ namespace UnityOnlineProjectServer.Content.Map
         public void BootChannel()
         {
             //Initialize Broadcast
-            broadcastLocation = new BroadcastLocation();
-            broadcastLocation.TickEvent += BroadcastLocationTickEventAction;
+            broadcastMoving = new BroadcastMoving();
+            broadcastMoving.TickEvent += BroadcastMovingTickEventAction;
+            broadcastPosition = new BroadcastPosition();
+            broadcastPosition.TickEvent += BroadcastPositionTickEventAction;
 
             InitializeGlobalServerTask();
 
@@ -44,7 +47,6 @@ namespace UnityOnlineProjectServer.Content.Map
             //Create Clients
             clients = new ConcurrentDictionary<long, ConnectedClient>();
         }
-
 
         public bool AddClient(ConnectedClient client)
         {
@@ -124,7 +126,8 @@ namespace UnityOnlineProjectServer.Content.Map
                     }
 
                     //Send datas for all channel clients
-                    broadcastLocation.CountTick(_tickInterval);
+                    broadcastMoving.CountTick(_tickInterval);
+                    broadcastPosition.CountTick(_tickInterval);
                 }
             }), _globalServerTaskCancellationToken);
 
@@ -146,11 +149,18 @@ namespace UnityOnlineProjectServer.Content.Map
             }
         }
 
-        private void BroadcastLocationTickEventAction(object sender, EventArgs e)
+        private void BroadcastPositionTickEventAction(object sender, EventArgs e)
+        {
+            foreach (var client in clients.Values)
+            {
+                BroadcastClientPosition(client);
+            }
+        }
+        private void BroadcastMovingTickEventAction(object sender, EventArgs e)
         {
             foreach(var client in clients.Values)
             {
-                BroadcastExistClient(client);
+                BroadcastMovingClient(client);
             }
         }
 
@@ -159,7 +169,7 @@ namespace UnityOnlineProjectServer.Content.Map
             BroadcastNewClient((ConnectedClient)sender);
         }
 
-        private void BroadcastExistClient(ConnectedClient client)
+        private void BroadcastMovingClient(ConnectedClient client)
         {
             foreach (var target in clients.Values)
             {
@@ -167,10 +177,23 @@ namespace UnityOnlineProjectServer.Content.Map
 
                 if (client.PlayerObject != null)
                 {
-                    var message = client.PlayerObject.CreateCurrentStatusMessage(MessageType.TankPositionReport);
+                    var message = client.PlayerObject.CreateCurrentMovingStatusMessage(MessageType.TankMovingReport);
                     target.SendTextData(message);
                 }
                 
+            }
+        }
+
+        private void BroadcastClientPosition(ConnectedClient client)
+        {
+            foreach (var target in clients.Values)
+            {
+                if (client.PlayerObject != null)
+                {
+                    var message = client.PlayerObject.CreateCurrentStatusMessage(MessageType.TankPositionReport);
+                    target.SendTextData(message);
+                }
+
             }
         }
 
@@ -216,7 +239,7 @@ namespace UnityOnlineProjectServer.Content.Map
         {
             status = ChannelStatus.Disable;
 
-            broadcastLocation.TickEvent -= BroadcastLocationTickEventAction;
+            broadcastMoving.TickEvent -= BroadcastMovingTickEventAction;
 
             CancelChannelTask();
 

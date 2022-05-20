@@ -331,6 +331,12 @@ namespace UnityOnlineProjectServer.Connection
                     PlayerObject.ApplyCurrentStatusMessage(message);
 
                     break;
+
+                case MessageType.TankMovingReport:
+
+                    PlayerObject.ApplyCurrentMovingStatusMessage(message);
+
+                    break;
             }
         }
         #endregion

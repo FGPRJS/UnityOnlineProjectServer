@@ -15,6 +15,7 @@ namespace UnityOnlineProjectServer.Protocol
         GameObjectSpawnReport,
         GameObjectDestroyReport,
         TankPositionReport,
+        TankMovingReport,
         GameObjectActionRequest,
         PlayerChatReport
     }
