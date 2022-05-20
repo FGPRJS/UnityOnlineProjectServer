@@ -9,8 +9,7 @@ namespace UnityOnlineProjectServer.Content.GameObject.Implements
     {
         public Dummy(long id) : base(id)
         {
-            isDetector = false;
-            sight = 1;
+           
         }
 
         public override void ApplyCurrentMovingStatusMessage(CommunicationMessage<Dictionary<string, string>> message)

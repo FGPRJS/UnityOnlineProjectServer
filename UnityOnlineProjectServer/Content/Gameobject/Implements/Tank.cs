@@ -34,8 +34,6 @@ namespace UnityOnlineProjectServer.Content.GameObject.Implements
         public TankType subType;
         public Tank(long id) : base(id)
         {
-            isDetector = true;
-            sight = 300;
         }
 
         ~Tank()
@@ -56,6 +54,7 @@ namespace UnityOnlineProjectServer.Content.GameObject.Implements
                     Any = new Dictionary<string, string>()
                     {
                         ["ID"] = id.ToString(),
+                        ["PawnName"] = PawnName,
                         ["ObjectType"] = PawnType.Tank.ToString(),
                         ["ObjectSubType"] = subType.ToString(),
                         ["Position"] = Position.ToString(),

@@ -57,6 +57,7 @@ namespace UnityOnlineProjectServer.Content.Map
                     client.id = i;
                     client.ShutdownRequestEvent += RemoveClient;
                     client.PlayerObjectAssignedEvent += PlayerObjectAssigned;
+                    client.ChatEvent += BroadcastChatMessage;
 
                     clients.TryAdd(i, client);
 
@@ -85,6 +86,10 @@ namespace UnityOnlineProjectServer.Content.Map
         {
             ConnectedClient client;
             clients.TryRemove(id, out client);
+
+            client.ShutdownRequestEvent -= RemoveClient;
+            client.PlayerObjectAssignedEvent -= PlayerObjectAssigned;
+            client.ChatEvent -= BroadcastChatMessage;
 
             BroadcastRemoveClient(client);
 
@@ -148,6 +153,11 @@ namespace UnityOnlineProjectServer.Content.Map
                 Console.WriteLine("Cancel GlobalTask is already requested.");
             }
         }
+
+        #endregion // Global Tick Task
+        #endregion // TickTask
+
+        #region Broadcasting
 
         private void BroadcastPositionTickEventAction(object sender, EventArgs e)
         {
@@ -228,10 +238,18 @@ namespace UnityOnlineProjectServer.Content.Map
             }
         }
 
-        #endregion // Global Tick Task
+        private void BroadcastChatMessage(object sender, CommunicationMessage<Dictionary<string,string>> message)
+        {
+            foreach(var target in clients.Values)
+            {
+                target.SendTextData(message);
+            }
+        }
 
 
-        #endregion // TickTask
+        #endregion
+
+
 
         #region Shutdown
 

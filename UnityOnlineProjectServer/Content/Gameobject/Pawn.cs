@@ -16,10 +16,8 @@ namespace UnityOnlineProjectServer.Content
         }
 
         public long id;
-        public string PawnName;
 
-        public bool isDetector;
-        public float sight;
+        public string PawnName;
 
         public Vector3 Position = Vector3.Zero;
         public Quaternion Rotation;

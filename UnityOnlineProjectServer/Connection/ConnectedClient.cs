@@ -41,6 +41,7 @@ namespace UnityOnlineProjectServer.Connection
         public long id;
         public EventHandler PlayerObjectAssignedEvent;
         public EventHandler HandshakeCompleteEvent;
+        public EventHandler<CommunicationMessage<Dictionary<string,string>>> ChatEvent;
         public EventHandler<long> ShutdownRequestEvent;
 
 
@@ -273,6 +274,12 @@ namespace UnityOnlineProjectServer.Connection
 
                     break;
 
+                case MessageType.PlayerChatReport:
+
+                    ChatEvent.Invoke(this, message);
+
+                    break;
+
                 case MessageType.GameObjectSpawnRequest:
 
                     Vector3 position = new Vector3(
@@ -300,6 +307,7 @@ namespace UnityOnlineProjectServer.Connection
                             //Create Object
                             var newTank = new Tank(id);
                             newTank.subType = (TankType)subtype;
+                            newTank.PawnName = clientName;
                             newTank.Position = position;
                             newTank.Rotation = rotation;
 
@@ -313,6 +321,7 @@ namespace UnityOnlineProjectServer.Connection
                         Any = new Dictionary<string, string>()
                         {
                             ["ID"] = PlayerObject.id.ToString(),
+                            ["PawnName"] = clientName,
                             ["ObjectType"] = message.body.Any["ObjectType"],
                             ["ObjectSubType"] = subobjectType,
                             ["Position"] = position.ToString(),
