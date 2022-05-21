@@ -8,7 +8,7 @@ namespace UnityOnlineProjectServer.Content.TickTasking
     {
         public BroadcastPosition()
         {
-            _interval = 3000;
+            _interval = 1000;
             _maxCount = 9999;
         }
     }
