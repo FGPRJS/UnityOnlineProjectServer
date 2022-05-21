@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityOnlineProjectServer.Content.Map;
+using UnityOnlineProjectServer.Utility;
 
 namespace UnityOnlineProjectServer.Connection
 {
@@ -38,12 +39,12 @@ namespace UnityOnlineProjectServer.Connection
 
         public void Start()
         {
-            Console.WriteLine("Server Start");
+            Logger.Instance.InfoLog("Server Start");
 
             IPHostEntry ipHostInfo = Dns.GetHostEntry(Dns.GetHostName());
             IPAddress ipAddress = ipHostInfo.AddressList[0];
 
-            Console.WriteLine("Server Start at " + ipAddress.ToString());
+            Logger.Instance.InfoLog("Server Start at " + ipAddress.ToString());
 
             listener = new TcpListener(ipAddress, Port);
 
@@ -52,7 +53,7 @@ namespace UnityOnlineProjectServer.Connection
 
         public void StartLocal()
         {
-            Console.WriteLine("Server Start");
+            Logger.Instance.InfoLog("Server Start");
 
             IPHostEntry ipHostInfo = Dns.GetHostEntry("localhost");
             IPAddress ipAddress = ipHostInfo.AddressList[1];
@@ -72,13 +73,13 @@ namespace UnityOnlineProjectServer.Connection
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Open Failed. Reason : " + ex.Message);
+                Logger.Instance.InfoLog("Open Failed. Reason : " + ex.Message);
             }
         }
 
         private void ClientAccepted(IAsyncResult ar)
         {
-            Console.WriteLine("Connecting client detected");
+            Logger.Instance.InfoLog("Connecting client detected");
 
             // Get the socket that handles the client request.  
             var clientSocket = listener.EndAcceptTcpClient(ar);
@@ -116,7 +117,7 @@ namespace UnityOnlineProjectServer.Connection
 
         public void ShutdownAllChannels()
         {
-            Console.WriteLine("ShutDown channels...");
+            Logger.Instance.InfoLog("ShutDown channels...");
 
             //All ShutDown
             foreach(var channel in channels.Values)
@@ -124,12 +125,12 @@ namespace UnityOnlineProjectServer.Connection
                 channel.ShutDownChannel();
             }
 
-            Console.WriteLine("ShutDown channels complete!");
+            Logger.Instance.InfoLog("ShutDown channels complete!");
         }
 
         public void ShutDownServer()
         {
-            Console.WriteLine("Shutdown server...");
+            Logger.Instance.InfoLog("Shutdown server...");
 
             ShutdownAllChannels();
 
@@ -138,7 +139,7 @@ namespace UnityOnlineProjectServer.Connection
             //Server ShutDown
             listener.Stop();
 
-            Console.WriteLine("Shutdown server complete!");
+            Logger.Instance.InfoLog("Shutdown server complete!");
         }
         #endregion
     }

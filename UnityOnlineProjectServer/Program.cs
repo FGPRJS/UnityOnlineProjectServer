@@ -16,7 +16,7 @@ namespace UnityOnlineProjectServer
 
             GameServer server = new GameServer();
 
-            Console.WriteLine("Server turned on");
+            Logger.Instance.InfoLog("Server turned on");
 
             while (isRun)
             {

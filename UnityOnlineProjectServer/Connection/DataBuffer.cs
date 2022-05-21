@@ -208,8 +208,8 @@ namespace UnityOnlineProjectServer.Connection
                                 }
                                 catch (Exception e)
                                 {
-                                    Console.WriteLine($"Cannot Parse message. Reason : ${e.Message}");
-                                    Console.WriteLine($"Received Message : " + Encoding.UTF8.GetString(frame.data));
+                                    Logger.Instance.InfoLog($"Cannot Parse message. Reason : ${e.Message}");
+                                    Logger.Instance.InfoLog($"Received Message : " + Encoding.UTF8.GetString(frame.data));
                                 }
 
                                 frame.ResetFrame();

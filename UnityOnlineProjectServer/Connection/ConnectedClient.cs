@@ -13,6 +13,7 @@ using UnityOnlineProjectServer.Content;
 using UnityOnlineProjectServer.Content.GameObject.Implements;
 using UnityOnlineProjectServer.Content.TickTasking;
 using UnityOnlineProjectServer.Protocol;
+using UnityOnlineProjectServer.Utility;
 using static UnityOnlineProjectServer.Content.GameObject.Implements.Tank;
 using static UnityOnlineProjectServer.Content.Pawn;
 
@@ -93,7 +94,7 @@ namespace UnityOnlineProjectServer.Connection
             try
             {
                 socketStatus = SocketStatus.HandShaking;
-                Console.WriteLine("Start Handshaking");
+                Logger.Instance.InfoLog("Start Handshaking");
 
                 stream.BeginRead(
                     receivedData.buffer,
@@ -104,11 +105,11 @@ namespace UnityOnlineProjectServer.Connection
             }
             catch (NullReferenceException ne)
             {
-                Console.WriteLine("ClientSocket Lost");
+                Logger.Instance.InfoLog("ClientSocket Lost");
             }
             catch (SocketException se)
             {
-                Console.WriteLine($"Socket is not available. Shutdown Client. Client Name : {clientName} / Client ID : {id}");
+                Logger.Instance.InfoLog($"Socket is not available. Shutdown Client. Client Name : {clientName} / Client ID : {id}");
                 ShutDownRequest();
             }
         }
@@ -146,7 +147,7 @@ namespace UnityOnlineProjectServer.Connection
                         CancellationToken.None);
 
                     socketStatus = SocketStatus.Connected;
-                    Console.WriteLine("Hanshaking Complete");
+                    Logger.Instance.InfoLog("Hanshaking Complete");
 
                     BeginReceive();
                 }
@@ -160,13 +161,13 @@ namespace UnityOnlineProjectServer.Connection
 
                     SendTextData(response);
 
-                    Console.WriteLine("Handshaking Failed.");
+                    Logger.Instance.InfoLog("Handshaking Failed.");
                     ShutDownRequest();
                 }
             }
             catch
             {
-                Console.WriteLine("Handshaking Failed.");
+                Logger.Instance.InfoLog("Handshaking Failed.");
                 ShutDownRequest();
             }
         }
@@ -186,7 +187,7 @@ namespace UnityOnlineProjectServer.Connection
             }
             catch(Exception ne)
             {
-                Console.WriteLine($"Socket is not available. Shutdown Client. Shutdown Client. Client Name : {clientName} / Client ID : {id}");
+                Logger.Instance.InfoLog($"Socket is not available. Shutdown Client. Shutdown Client. Client Name : {clientName} / Client ID : {id}");
                 ShutDownRequest();
             }
         }
@@ -196,7 +197,7 @@ namespace UnityOnlineProjectServer.Connection
             try
             {
                 int bytesRead = stream.EndRead(ar);
-                Console.WriteLine($"{bytesRead}byte(s) Data Received.");
+                Logger.Instance.InfoLog($"{bytesRead}byte(s) Data Received.");
 
                 if (bytesRead > 0)
                 {
@@ -204,7 +205,7 @@ namespace UnityOnlineProjectServer.Connection
 
                     if (receivedMessage != null)
                     {
-                        Console.WriteLine("Receive : " + JsonConvert.SerializeObject(receivedMessage));
+                        Logger.Instance.InfoLog("Receive : " + JsonConvert.SerializeObject(receivedMessage));
                         ProcessMessage(receivedMessage);
                     }
 
@@ -212,7 +213,7 @@ namespace UnityOnlineProjectServer.Connection
                 }
                 else
                 {
-                    Console.WriteLine("Client Closed.");
+                    Logger.Instance.InfoLog("Client Closed.");
                     ShutDownRequest();
                 }
 
@@ -220,12 +221,12 @@ namespace UnityOnlineProjectServer.Connection
             }
             catch (NullReferenceException)
             {
-                Console.WriteLine("Network Stream Lost");
+                Logger.Instance.InfoLog("Network Stream Lost");
                 ShutDownRequest();
             }
             catch (IOException)
             {
-                Console.WriteLine("Network Stream is not available. Shutdown Client.");
+                Logger.Instance.InfoLog("Network Stream is not available. Shutdown Client.");
                 ShutDownRequest();
             }
         }
@@ -244,7 +245,7 @@ namespace UnityOnlineProjectServer.Connection
             }
             catch
             {
-                Console.WriteLine("MessageType crashed. Cannot process message");
+                Logger.Instance.InfoLog("MessageType crashed. Cannot process message");
                 return;
             }
 
@@ -377,12 +378,12 @@ namespace UnityOnlineProjectServer.Connection
             try
             {
                 var byteData = CommunicationUtility.Serialize(message);
-                Console.WriteLine("Send : " + JsonConvert.SerializeObject(message));
+                Logger.Instance.InfoLog("Send : " + JsonConvert.SerializeObject(message));
                 SendTextData(byteData);
             }
             catch(Exception ex)
             {
-                Console.WriteLine("Cannot send Data. Reason : " + ex.Message);
+                Logger.Instance.InfoLog("Cannot send Data. Reason : " + ex.Message);
             }
         }
 
@@ -390,7 +391,7 @@ namespace UnityOnlineProjectServer.Connection
         {
             try
             {
-                Console.WriteLine($"Send {byteData.Length} byte(s) ByteData to client.");
+                Logger.Instance.InfoLog($"Send {byteData.Length} byte(s) ByteData to client. Target : {clientName}");
 
                 var result = DataBuffer.EncodeRFC6455(DataFrame.OPCode.Text, byteData);
 
@@ -402,7 +403,7 @@ namespace UnityOnlineProjectServer.Connection
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Cannot send Data. Reason : " + ex.Message);
+                Logger.Instance.InfoLog("Cannot send Data. Reason : " + ex.Message);
             }
         }
 
@@ -410,7 +411,7 @@ namespace UnityOnlineProjectServer.Connection
         {
             try
             {
-                Console.WriteLine("Send PING");
+                Logger.Instance.InfoLog("Send PING");
 
                 var result = DataBuffer.EncodeRFC6455(DataFrame.OPCode.Ping, new byte[0]);
 
@@ -422,7 +423,7 @@ namespace UnityOnlineProjectServer.Connection
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Cannot send PING. Reason : " + ex.Message);
+                Logger.Instance.InfoLog("Cannot send PING. Reason : " + ex.Message);
             }
         }
 
@@ -430,7 +431,7 @@ namespace UnityOnlineProjectServer.Connection
         {
             try
             {
-                Console.WriteLine("Send PONG");
+                Logger.Instance.InfoLog("Send PONG");
 
                 var result = DataBuffer.EncodeRFC6455(DataFrame.OPCode.Pong, new byte[0]);
 
@@ -442,7 +443,7 @@ namespace UnityOnlineProjectServer.Connection
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Cannot send PONG. Reason : " + ex.Message);
+                Logger.Instance.InfoLog("Cannot send PONG. Reason : " + ex.Message);
             }
         }
 
@@ -464,7 +465,7 @@ namespace UnityOnlineProjectServer.Connection
 
             ShutdownRequestEvent?.Invoke(this, id);
 
-            Console.WriteLine($"Client ID : {id} requested shutdown.");
+            Logger.Instance.InfoLog($"Client ID : {id} requested shutdown.");
         }
     }
 }

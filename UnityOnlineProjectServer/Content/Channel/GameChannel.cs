@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using UnityOnlineProjectServer.Connection;
 using UnityOnlineProjectServer.Content.TickTasking;
 using UnityOnlineProjectServer.Protocol;
+using UnityOnlineProjectServer.Utility;
 
 namespace UnityOnlineProjectServer.Content.Map
 {
@@ -86,7 +87,7 @@ namespace UnityOnlineProjectServer.Content.Map
         {
             ConnectedClient client = sender as ConnectedClient;
 
-            Console.WriteLine($"Removing Client. ClientName : {client.clientName} / ID : {client.id}");
+            Logger.Instance.InfoLog($"Removing Client. ClientName : {client.clientName} / ID : {client.id}");
 
             BroadcastRemoveClient(client);
 
@@ -98,7 +99,7 @@ namespace UnityOnlineProjectServer.Content.Map
 
             client?.socket?.Close();
 
-            Console.WriteLine($"Removing Client. ID : {id}");
+            Logger.Instance.InfoLog($"Removing Client. ID : {id}");
         }
 
 
@@ -155,7 +156,7 @@ namespace UnityOnlineProjectServer.Content.Map
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Cancel GlobalTask is already requested.");
+                Logger.Instance.InfoLog("Cancel GlobalTask is already requested.");
             }
         }
 
@@ -260,7 +261,7 @@ namespace UnityOnlineProjectServer.Content.Map
 
         public void ShutDownChannel()
         {
-            Console.WriteLine("Shutdown Channel.");
+            Logger.Instance.InfoLog("Shutdown Channel.");
 
             status = ChannelStatus.Disable;
 
