@@ -1,8 +1,6 @@
-﻿#define debug
-
-
-using System;
+﻿using System;
 using System.Numerics;
+using System.Threading;
 using UnityOnlineProjectServer.Connection;
 using UnityOnlineProjectServer.Content.Map;
 using UnityOnlineProjectServer.Utility;
@@ -18,6 +16,12 @@ namespace UnityOnlineProjectServer
             GameServer server = new GameServer();
 
             Logger.Instance.InfoLog("Server turned on");
+            Logger.Instance.InfoLog("---Server Spec Info---");
+            Logger.Instance.InfoLog($"Processor Count : {Environment.ProcessorCount}");
+            ThreadPool.GetAvailableThreads(out var worker, out var asyncIO);
+            Logger.Instance.InfoLog($"Available WorkerThread Count : {worker}");
+            Logger.Instance.InfoLog($"Available AsyncI/O Count : {asyncIO}");
+            Logger.Instance.InfoLog($"ThreadPool Thread Count : {ThreadPool.ThreadCount}");
 
             while (isRun)
             {
