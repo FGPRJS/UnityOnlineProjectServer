@@ -98,11 +98,10 @@ namespace UnityOnlineProjectServer.Connection
         private void FindChannelForClient(object sender, EventArgs e)
         {
             var client = (ConnectedClient)sender;
-            bool dummy;
 
             client.HandshakeCompleteEvent -= FindChannelForClient;
 
-            lobby.TryRemove(client, out dummy);
+            lobby.TryRemove(client, out var dummy);
             foreach(var channel in channels.Values)
             {
                 var result = channel.AddClient(client);

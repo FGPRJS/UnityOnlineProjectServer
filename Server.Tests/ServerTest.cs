@@ -71,8 +71,8 @@ namespace Server.Tests
             }
             while (!result.EndOfMessage);
             
-
             var message = CommunicationUtility.Deserialize(buffer.Array);
+
 
             Assert.Equal("TESTER", message.body.Any["UserName"]);
         }

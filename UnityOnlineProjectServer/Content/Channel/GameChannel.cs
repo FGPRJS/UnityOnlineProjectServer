@@ -84,16 +84,21 @@ namespace UnityOnlineProjectServer.Content.Map
 
         public void RemoveClient(object sender, long id)
         {
-            ConnectedClient client;
-            clients.TryRemove(id, out client);
+            ConnectedClient client = sender as ConnectedClient;
+
+            Console.WriteLine($"Removing Client. ClientName : {client.clientName} / ID : {client.id}");
+
+            BroadcastRemoveClient(client);
+
+            clients.TryRemove(id, out var dummy);
 
             client.ShutdownRequestEvent -= RemoveClient;
             client.PlayerObjectAssignedEvent -= PlayerObjectAssigned;
             client.ChatEvent -= BroadcastChatMessage;
 
-            BroadcastRemoveClient(client);
-
             client?.socket?.Close();
+
+            Console.WriteLine($"Removing Client. ID : {id}");
         }
 
 
@@ -255,6 +260,8 @@ namespace UnityOnlineProjectServer.Content.Map
 
         public void ShutDownChannel()
         {
+            Console.WriteLine("Shutdown Channel.");
+
             status = ChannelStatus.Disable;
 
             broadcastMoving.TickEvent -= BroadcastMovingTickEventAction;

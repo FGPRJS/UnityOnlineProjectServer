@@ -108,7 +108,7 @@ namespace UnityOnlineProjectServer.Connection
             }
             catch (SocketException se)
             {
-                Console.WriteLine("Socket is not available. Shutdown Client.");
+                Console.WriteLine($"Socket is not available. Shutdown Client. Client Name : {clientName} / Client ID : {id}");
                 ShutDownRequest();
             }
         }
@@ -186,7 +186,7 @@ namespace UnityOnlineProjectServer.Connection
             }
             catch(Exception ne)
             {
-                Console.WriteLine("Socket is not available. Shutdown Client.");
+                Console.WriteLine($"Socket is not available. Shutdown Client. Shutdown Client. Client Name : {clientName} / Client ID : {id}");
                 ShutDownRequest();
             }
         }
@@ -201,8 +201,12 @@ namespace UnityOnlineProjectServer.Connection
                 if (bytesRead > 0)
                 {
                     var receivedMessage = receivedData.DecodeFrameRFC6455(bytesRead);
-                    Console.WriteLine("Receive : " + JsonConvert.SerializeObject(receivedMessage));
-                    ProcessMessage(receivedMessage);
+
+                    if (receivedMessage != null)
+                    {
+                        Console.WriteLine("Receive : " + JsonConvert.SerializeObject(receivedMessage));
+                        ProcessMessage(receivedMessage);
+                    }
 
                     BeginReceive();
                 }
@@ -459,6 +463,8 @@ namespace UnityOnlineProjectServer.Connection
             socket = null;
 
             ShutdownRequestEvent?.Invoke(this, id);
+
+            Console.WriteLine($"Client ID : {id} requested shutdown.");
         }
     }
 }

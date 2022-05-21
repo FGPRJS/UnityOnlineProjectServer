@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using Newtonsoft.Json;
 using UnityOnlineProjectServer.Protocol;
 using UnityOnlineProjectServer.Utility;
 
@@ -199,7 +200,17 @@ namespace UnityOnlineProjectServer.Connection
 
                             if (!frame.hasContinuousData)
                             {
-                                var message = CommunicationUtility.Deserialize(frame.data);
+                                CommunicationMessage<Dictionary<string,string>> message = null;
+
+                                try
+                                {
+                                    message = CommunicationUtility.Deserialize(frame.data);
+                                }
+                                catch (Exception e)
+                                {
+                                    Console.WriteLine($"Cannot Parse message. Reason : ${e.Message}");
+                                    Console.WriteLine($"Received Message : " + Encoding.UTF8.GetString(frame.data));
+                                }
 
                                 frame.ResetFrame();
 
