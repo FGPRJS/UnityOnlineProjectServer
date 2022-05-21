@@ -18,8 +18,10 @@ namespace UnityOnlineProjectServer.Connection
             frame = new DataFrame();
         }
 
-        public CommunicationMessage<Dictionary<string, string>> DecodeFrameRFC6455(int bytesRead)
+        public List<CommunicationMessage<Dictionary<string, string>>> DecodeFrameRFC6455(int bytesRead)
         {
+            var messageList = new List<CommunicationMessage<Dictionary<string, string>>>();
+
             for (var i = 0; i < bytesRead; i++)
             {
                 var data = buffer[i];
@@ -38,55 +40,7 @@ namespace UnityOnlineProjectServer.Connection
                             frame.opcode = (DataFrame.OPCode)BitByte.PartofBitArraytoByte(dataBitArr, 4);
                             if (Enum.IsDefined(typeof(DataFrame.OPCode), frame.opcode))
                             {
-                                switch (frame.opcode)
-                                {
-                                    case DataFrame.OPCode.Ping:
-
-                                        var pingMessage = new CommunicationMessage<Dictionary<string, string>>()
-                                        {
-                                            header = new Header()
-                                            {
-                                                MessageName = MessageType.Ping.ToString(),
-                                            }
-                                        };
-
-                                        frame.ResetFrame();
-
-                                        return pingMessage;
-
-                                    case DataFrame.OPCode.Pong:
-
-                                        var pongMessage = new CommunicationMessage<Dictionary<string, string>>()
-                                        {
-                                            header = new Header()
-                                            {
-                                                MessageName = MessageType.Pong.ToString(),
-                                            }
-                                        };
-
-                                        frame.ResetFrame();
-
-                                        return pongMessage;
-
-                                    case DataFrame.OPCode.Close:
-
-                                        var closeMessage = new CommunicationMessage<Dictionary<string, string>>()
-                                        {
-                                            header = new Header()
-                                            {
-                                                MessageName = MessageType.Close.ToString(),
-                                            }
-                                        };
-
-                                        frame.ResetFrame();
-
-                                        return closeMessage;
-
-                                    default:
-                                        frame.process = DataFrame.DataFrameProcess.MASK_PayloadLen;
-                                        frame.hasContinuousData = false;
-                                        break;
-                                }
+                                frame.process = DataFrame.DataFrameProcess.MASK_PayloadLen;
                             }
                             else
                             {
@@ -176,6 +130,14 @@ namespace UnityOnlineProjectServer.Connection
                             frame.process = DataFrame.DataFrameProcess.DATA;
                         }
 
+                        //if there is no data
+                        if((frame.process == DataFrame.DataFrameProcess.DATA) && (frame.PayloadLength == 0))
+                        {
+                            messageList.Add(CreateEmptyDataMessage());
+                            frame.ResetFrame();
+                            frame.process = DataFrame.DataFrameProcess.FIN_OPCode;
+                        }
+
                         break;
 
                     case DataFrame.DataFrameProcess.DATA:
@@ -195,37 +157,92 @@ namespace UnityOnlineProjectServer.Connection
 
                         if (frame.dataIndex >= frame.PayloadLength)
                         {
-                            //Receive Complete
-                            frame.process = DataFrame.DataFrameProcess.FIN_OPCode;
-
                             if (!frame.hasContinuousData)
                             {
-                                CommunicationMessage<Dictionary<string,string>> message = null;
 
-                                try
+                                CommunicationMessage<Dictionary<string, string>> message = null;
+
+                                if (frame.opcode == DataFrame.OPCode.Text)
                                 {
-                                    message = CommunicationUtility.Deserialize(frame.data);
+                                    try
+                                    {
+                                        message = CommunicationUtility.Deserialize(frame.data);
+                                    }
+                                    catch (Exception e)
+                                    {
+                                        Logger.Instance.ErrorLog($"Cannot Parse message. Reason : ${e.Message}");
+                                        Logger.Instance.ErrorLog($"Received Message : " + Encoding.UTF8.GetString(frame.data));
+                                    }
                                 }
-                                catch (Exception e)
+                                else if(frame.opcode == DataFrame.OPCode.Close)
                                 {
-                                    Logger.Instance.InfoLog($"Cannot Parse message. Reason : ${e.Message}");
-                                    Logger.Instance.InfoLog($"Received Message : " + Encoding.UTF8.GetString(frame.data));
+                                    message = new CommunicationMessage<Dictionary<string, string>>()
+                                    {
+                                        header = new Header()
+                                        {
+                                            MessageName = MessageType.Close.ToString(),
+                                        },
+                                        body = new Body<Dictionary<string, string>>()
+                                        {
+                                            Any = new Dictionary<string, string>()
+                                            {
+                                                ["Reason"] = Encoding.UTF8.GetString(frame.data)
+                                            }
+                                        }
+                                    };
                                 }
+
+                                messageList.Add(message);
 
                                 frame.ResetFrame();
 
-                                return message;
+                                break;
                             }
+
+                            //Receive Complete
+                            frame.process = DataFrame.DataFrameProcess.FIN_OPCode;
                         }
 
                         break;
                 }
-
-                //Clear Byte
-                buffer[i] = 0;
             }
 
-            return null;
+            return messageList;
+        }
+
+        private CommunicationMessage<Dictionary<string, string>> CreateEmptyDataMessage()
+        {
+            CommunicationMessage<Dictionary<string, string>> message = null;
+
+            switch (frame.opcode)
+            {
+                case DataFrame.OPCode.Ping:
+
+                    message = new CommunicationMessage<Dictionary<string, string>>()
+                    {
+                        header = new Header()
+                        {
+                            MessageName = MessageType.Ping.ToString(),
+                        }
+                    };
+
+                    break;
+
+                case DataFrame.OPCode.Pong:
+
+                    message = new CommunicationMessage<Dictionary<string, string>>()
+                    {
+                        header = new Header()
+                        {
+                            MessageName = MessageType.Pong.ToString(),
+                        }
+                    };
+
+                    break;
+
+            }
+
+            return message;
         }
 
 
