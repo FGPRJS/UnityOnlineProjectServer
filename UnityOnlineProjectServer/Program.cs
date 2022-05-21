@@ -13,6 +13,8 @@ namespace UnityOnlineProjectServer
         {
             var isRun = true;
 
+            ThreadPool.SetMinThreads(2, 1);
+
             GameServer server = new GameServer();
 
             Logger.Instance.InfoLog("Server turned on");
