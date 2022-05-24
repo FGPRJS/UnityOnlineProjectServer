@@ -345,7 +345,7 @@ namespace UnityOnlineProjectServer.Connection
 
                 case MessageType.TankPositionReport:
 
-                    PlayerObject.ApplyCurrentStatusMessage(message);
+                    PlayerObject.ApplyCurrentPositionStatusMessage(message);
 
                     break;
 

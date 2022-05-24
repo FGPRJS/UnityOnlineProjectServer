@@ -207,7 +207,7 @@ namespace UnityOnlineProjectServer.Content.Map
             {
                 if (client.PlayerObject != null)
                 {
-                    var message = client.PlayerObject.CreateCurrentStatusMessage(MessageType.TankPositionReport);
+                    var message = client.PlayerObject.CreateCurrentPositionMessage(MessageType.TankPositionReport);
                     target.SendTextData(message);
                 }
 
@@ -239,9 +239,17 @@ namespace UnityOnlineProjectServer.Content.Map
                 if ((client != null) && (!client.Equals(target))
                     && (client.PlayerObject != null))
                 {
-                    var message = client.PlayerObject?.CreateCurrentStatusMessage(MessageType.GameObjectDestroyReport);
+                    var message = client.PlayerObject?.CreateCurrentPositionMessage(MessageType.GameObjectDestroyReport);
                     target.SendTextData(message);
                 }
+            }
+        }
+
+        private void BroadcastMessage(object sender, CommunicationMessage<Dictionary<string, string>> message)
+        {
+            foreach (var target in clients.Values)
+            {
+                target.SendTextData(message);
             }
         }
 

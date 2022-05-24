@@ -21,6 +21,9 @@ namespace UnityOnlineProjectServer.Content
 
         public Vector3 Position = Vector3.Zero;
         public Quaternion Rotation;
+        public DateTime RecentPositionReceivedTime;
+
+        public DateTime RecentMovingReceivedTime;
 
         public Pawn(long id)
         {
