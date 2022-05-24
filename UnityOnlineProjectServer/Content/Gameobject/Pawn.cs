@@ -33,11 +33,11 @@ namespace UnityOnlineProjectServer.Content
 
         public abstract CommunicationMessage<Dictionary<string, string>> CreateObjectInfoMessage(MessageType messageType);
 
-        public abstract CommunicationMessage<Dictionary<string, string>> CreateCurrentStatusMessage(MessageType messageType);
+        public abstract CommunicationMessage<Dictionary<string, string>> CreateCurrentPositionMessage(MessageType messageType);
 
         public abstract CommunicationMessage<Dictionary<string, string>> CreateCurrentMovingStatusMessage(MessageType messageType);
 
         public abstract void ApplyCurrentMovingStatusMessage(CommunicationMessage<Dictionary<string, string>> message);
-        public abstract void ApplyCurrentStatusMessage(CommunicationMessage<Dictionary<string, string>> message);
+        public abstract void ApplyCurrentPositionStatusMessage(CommunicationMessage<Dictionary<string, string>> message);
     }
 }
