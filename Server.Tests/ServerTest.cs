@@ -89,7 +89,7 @@ namespace Server.Tests
             {
                 header = new Header()
                 {
-                    MessageName = MessageType.GameObjectSpawnRequest.ToString(),
+                    MessageName = MessageType.PlayerTankSpawnRequest.ToString(),
                 },
                 body = new Body<Dictionary<string, string>>()
                 {

@@ -59,6 +59,7 @@ namespace UnityOnlineProjectServer.Content.Map
                     client.ShutdownRequestEvent += RemoveClient;
                     client.PlayerObjectAssignedEvent += PlayerObjectAssigned;
                     client.ChatEvent += BroadcastChatMessage;
+                    client.BroadCastMessage += BroadcastMessage;
 
                     clients.TryAdd(i, client);
 
@@ -96,6 +97,7 @@ namespace UnityOnlineProjectServer.Content.Map
             client.ShutdownRequestEvent -= RemoveClient;
             client.PlayerObjectAssignedEvent -= PlayerObjectAssigned;
             client.ChatEvent -= BroadcastChatMessage;
+            client.BroadCastMessage -= BroadcastMessage;
 
             client?.socket?.Close();
 
@@ -196,7 +198,6 @@ namespace UnityOnlineProjectServer.Content.Map
                     var message = client.PlayerObject.CreateCurrentMovingStatusMessage(MessageType.TankMovingReport);
                     target.SendTextData(message);
                 }
-                
             }
         }
 

@@ -11,12 +11,13 @@ namespace UnityOnlineProjectServer.Protocol
         Ping,
         Pong,
         Close,
-        GameObjectSpawnRequest,
+        PlayerTankSpawnRequest,
         GameObjectSpawnReport,
         GameObjectDestroyReport,
         TankPositionReport,
         TankMovingReport,
         GameObjectActionRequest,
+        BulletSpawnRequest,
         PlayerChatReport
     }
 

@@ -43,6 +43,7 @@ namespace UnityOnlineProjectServer.Connection
         public EventHandler PlayerObjectAssignedEvent;
         public EventHandler HandshakeCompleteEvent;
         public EventHandler<CommunicationMessage<Dictionary<string,string>>> ChatEvent;
+        public EventHandler<CommunicationMessage<Dictionary<string,string>>> BroadCastMessage;
         public EventHandler<long> ShutdownRequestEvent;
 
 
@@ -287,7 +288,7 @@ namespace UnityOnlineProjectServer.Connection
 
                     break;
 
-                case MessageType.GameObjectSpawnRequest:
+                case MessageType.PlayerTankSpawnRequest:
 
                     Vector3 position = new Vector3(
                         RandomManager.GetRandomWithfloatingPoint(790, 800),
