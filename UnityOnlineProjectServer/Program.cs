@@ -1,6 +1,9 @@
-﻿using System;
+﻿#define debug
+
+using System;
 using System.Numerics;
 using System.Threading;
+using System.Threading.Tasks;
 using UnityOnlineProjectServer.Connection;
 using UnityOnlineProjectServer.Content.Map;
 using UnityOnlineProjectServer.Utility;
@@ -11,11 +14,7 @@ namespace UnityOnlineProjectServer
     {
         static void Main(string[] args)
         {
-            var isRun = true;
-
             ThreadPool.SetMinThreads(2, 1);
-
-            GameServer server = new GameServer();
 
             Logger.Instance.InfoLog("Server turned on");
             Logger.Instance.InfoLog("---Server Spec Info---");
@@ -25,35 +24,43 @@ namespace UnityOnlineProjectServer
             Logger.Instance.InfoLog($"Available AsyncI/O Count : {asyncIO}");
             Logger.Instance.InfoLog($"ThreadPool Thread Count : {ThreadPool.ThreadCount}");
 
-            while (isRun)
+            Thread trd = new Thread(() =>
             {
-                var Readed = Console.ReadLine();
+                var isRun = true;
 
-                switch (Readed.ToLower())
+                GameServer server = new GameServer();
+
+                while (isRun)
                 {
-                    case "x":
-                    case "exit":
-                    case "shutdown":
-                    case "quit":
+                    var readed = Console.ReadLine();
 
-                        isRun = false;
-                        server.ShutDownServer();
-
-                        break;
-
-                    case "start":
-                    case "on":
-                    case "o":
+                    switch (readed?.ToLower())
+                    {
+                        case "s":
+                        case "start":
 
 #if debug
-                        server.StartLocal();
+                            server.StartLocal();
 #else
-                        server.Start();
+                            server.Start();
 #endif
-                        break;
-                }
-            }
 
+                            break;
+
+                        case "x":
+                        case "stop":
+
+                            isRun = false;
+
+                            break;
+
+                        default:
+                            continue;
+                    }
+                }
+            });
+
+            trd.Start();
         }
     }
 }
