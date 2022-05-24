@@ -380,6 +380,7 @@ namespace UnityOnlineProjectServer.Connection
         {
             try
             {
+                message.header.SendTime = DateTime.Now;
                 var byteData = CommunicationUtility.Serialize(message);
                 Logger.Instance.InfoLog("Send : " + JsonConvert.SerializeObject(message));
                 SendTextData(byteData);
