@@ -17,6 +17,7 @@ namespace UnityOnlineProjectServer.Content.GameObject.Implements
 
         Vector3 _moveDirection;
         float _moveDelta;
+        float _moveSpeed;
         Vector3 _rotationVector;
         float _rotationDelta;
         Vector3 _towerRotationVector;
@@ -66,8 +67,12 @@ namespace UnityOnlineProjectServer.Content.GameObject.Implements
             return message;
         }
 
-        public override CommunicationMessage<Dictionary<string, string>> CreateCurrentStatusMessage(MessageType messageType)
+        public override CommunicationMessage<Dictionary<string, string>> CreateCurrentPositionMessage(MessageType messageType)
         {
+            var latency = DateTime.Now - RecentPositionReceivedTime;
+
+            var positionGap = _moveDirection * (_moveDelta * _moveSpeed * (latency.Milliseconds / 1000 + latency.Seconds));
+
             var TickMessage = new CommunicationMessage<Dictionary<string, string>>()
             {
                 header = new Header()
@@ -79,7 +84,7 @@ namespace UnityOnlineProjectServer.Content.GameObject.Implements
                     Any = new Dictionary<string, string>()
                     {
                         ["ID"] = id.ToString(),
-                        ["Position"] = Position.ToString(),
+                        ["Position"] = (Position + positionGap).ToString(),
                         ["Quaternion"] = Rotation.ToString(),
                         ["TowerQuaternion"] = TowerRotation.ToString(),
                         ["CannonQuaternion"] = CannonRotation.ToString()
@@ -91,7 +96,7 @@ namespace UnityOnlineProjectServer.Content.GameObject.Implements
         }
 
 
-        public override void ApplyCurrentStatusMessage(CommunicationMessage<Dictionary<string, string>> message)
+        public override void ApplyCurrentPositionStatusMessage(CommunicationMessage<Dictionary<string, string>> message)
         {
             var rawPositionData = message.body.Any["Position"];
             var readedPositionData = NumericParser.ParseVector(rawPositionData);
@@ -109,6 +114,8 @@ namespace UnityOnlineProjectServer.Content.GameObject.Implements
             Position = readedPositionData;
             TowerRotation = readedTowerRotationData;
             CannonRotation = readedCannonRotationData;
+            //Update Time
+            RecentPositionReceivedTime = message.header.SendTime;
         }
 
         public override CommunicationMessage<Dictionary<string, string>> CreateCurrentMovingStatusMessage(MessageType messageType)
@@ -143,8 +150,10 @@ namespace UnityOnlineProjectServer.Content.GameObject.Implements
         {
             var rawMoveDirection = message.body.Any["MoveDirection"];
             var moveDirection = NumericParser.ParseVector(rawMoveDirection);
-            var rawmoveDelta = message.body.Any["MoveDelta"];
-            var moveDelta = float.Parse(rawmoveDelta);
+            var rawMoveDelta = message.body.Any["MoveDelta"];
+            var moveDelta = float.Parse(rawMoveDelta);
+            var rawMoveSpeed = message.body.Any["MoveSpeed"];
+            var moveSpeed = float.Parse(rawMoveSpeed);
             var rawRotationVector = message.body.Any["RotationVector"];
             var rotationVector = NumericParser.ParseVector(rawRotationVector);
             var rawRotationDelta = message.body.Any["RotationDelta"];
@@ -160,12 +169,16 @@ namespace UnityOnlineProjectServer.Content.GameObject.Implements
 
             _moveDirection = moveDirection;
             _moveDelta = moveDelta;
+            _moveSpeed = moveSpeed;
             _rotationVector = rotationVector;
             _rotationDelta = rotationDelta;
             _towerRotationVector = towerRotationVector;
             _towerRotationDelta = towerRotationDelta;
             _cannonRotationVector = cannonRotationVector;
             _cannonRotationDelta = cannonRotationDelta;
+
+            //Update Time
+            RecentMovingReceivedTime = DateTime.Now;
         }
     }
 }

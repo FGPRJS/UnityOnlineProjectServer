@@ -17,7 +17,7 @@ namespace UnityOnlineProjectServer.Content.GameObject.Implements
             throw new NotImplementedException();
         }
 
-        public override void ApplyCurrentStatusMessage(CommunicationMessage<Dictionary<string, string>> message)
+        public override void ApplyCurrentPositionStatusMessage(CommunicationMessage<Dictionary<string, string>> message)
         {
             return;
         }
@@ -27,7 +27,7 @@ namespace UnityOnlineProjectServer.Content.GameObject.Implements
             throw new NotImplementedException();
         }
 
-        public override CommunicationMessage<Dictionary<string, string>> CreateCurrentStatusMessage(MessageType messageType)
+        public override CommunicationMessage<Dictionary<string, string>> CreateCurrentPositionMessage(MessageType messageType)
         {
             return null;
         }
