@@ -354,6 +354,15 @@ namespace UnityOnlineProjectServer.Connection
                     PlayerObject.ApplyCurrentMovingStatusMessage(message);
 
                     break;
+
+                case MessageType.BulletSpawnRequest:
+
+                    message.header.ACK = (int)ACK.ACK;
+
+                    BroadCastMessage?.Invoke(this, message);
+
+                    break;
+
             }
         }
         #endregion
