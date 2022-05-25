@@ -29,6 +29,7 @@ AWS LightSail Server
 - JS WebSocket ([RFC 6455 Spec](https://datatracker.ietf.org/doc/html/rfc6455))
 - log4net
 - xunit
+- Microsoft.Extensions.Hosting
 
 **Server SPEC**
 - AWS LightSail
