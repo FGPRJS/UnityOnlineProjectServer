@@ -24,6 +24,8 @@ namespace UnityOnlineProjectServer.Connection
         public static long ChannelCount = 1;
         public ConcurrentDictionary<long, GameChannel> channels;
 
+        public EventHandler ServerShutdownEvent;
+
         public GameServer()
         {
             lobby = new ConcurrentDictionary<ConnectedClient, bool>();
@@ -140,6 +142,8 @@ namespace UnityOnlineProjectServer.Connection
             listener.Stop();
 
             Logger.Instance.InfoLog("Shutdown server complete!");
+
+            ServerShutdownEvent?.Invoke(this, EventArgs.Empty);
         }
         #endregion
     }

@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "UnityOnlineProjectServer": {
+      "commandName": "Project",
+      "commandLineArgs": "debug"
+    }
+  }
+}

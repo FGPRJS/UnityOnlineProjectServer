@@ -1,6 +1,4 @@
-﻿#define debug
-
-using System;
+﻿using System;
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,7 +12,7 @@ namespace UnityOnlineProjectServer
     {
         static void Main(string[] args)
         {
-            ThreadPool.SetMinThreads(2, 1);
+            ThreadPool.SetMinThreads(3, 1);
 
             Logger.Instance.InfoLog("Server turned on");
             Logger.Instance.InfoLog("---Server Spec Info---");
@@ -24,43 +22,34 @@ namespace UnityOnlineProjectServer
             Logger.Instance.InfoLog($"Available AsyncI/O Count : {asyncIO}");
             Logger.Instance.InfoLog($"ThreadPool Thread Count : {ThreadPool.ThreadCount}");
 
-            Thread trd = new Thread(() =>
+            var server = new GameServer();
+
+            Logger.Instance.InfoLog("Server process ON.");
+
+            bool isRun = true;
+            bool isDebug = false;
+
+            if((args.Length > 0) && (args[0].ToLower() == "debug"))
             {
-                var isRun = true;
+                isDebug = true;
+            }
 
-                GameServer server = new GameServer();
+            if(isDebug)
+                server.StartLocal();
+            else
+                server.Start();
 
-                while (isRun)
-                {
-                    var readed = Console.ReadLine();
+            ManualResetEvent _quitEvent = new ManualResetEvent(false);
 
-                    switch (readed?.ToLower())
-                    {
-                        case "s":
-                        case "start":
+            server.ServerShutdownEvent += (sender, arg) =>
+            {
+                _quitEvent.Set();
+            };
 
-#if debug
-                            server.StartLocal();
-#else
-                            server.Start();
-#endif
+            _quitEvent.WaitOne();
 
-                            break;
 
-                        case "x":
-                        case "stop":
-
-                            isRun = false;
-
-                            break;
-
-                        default:
-                            continue;
-                    }
-                }
-            });
-
-            trd.Start();
+            Logger.Instance.InfoLog("Server process OFF");
         }
     }
 }
