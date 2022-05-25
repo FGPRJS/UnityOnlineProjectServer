@@ -24,6 +24,7 @@ namespace UnityOnlineProjectServer.Content.GameObject.Implements
         float _towerRotationDelta;
         Vector3 _cannonRotationVector;
         float _cannonRotationDelta;
+        float _frameRate;
 
         public enum TankType
         {
@@ -71,7 +72,7 @@ namespace UnityOnlineProjectServer.Content.GameObject.Implements
         {
             var latency = DateTime.Now - RecentPositionReceivedTime;
 
-            var positionGap = _moveDirection * (_moveDelta * _moveSpeed * (latency.Milliseconds / 1000 + latency.Seconds));
+            var positionGap = _moveDirection * (_moveDelta * _moveSpeed * (latency.Milliseconds / 1000 + latency.Seconds) * _frameRate);
 
             var TickMessage = new CommunicationMessage<Dictionary<string, string>>()
             {
@@ -139,6 +140,7 @@ namespace UnityOnlineProjectServer.Content.GameObject.Implements
                         ["TowerRotationDelta"] = _towerRotationDelta.ToString(),
                         ["CannonRotationVector"] = _cannonRotationVector.ToString(),
                         ["CannonRotationDelta"] = _cannonRotationDelta.ToString(),
+                        ["FrameRate"] = _frameRate.ToString(),
                     }
                 }
             };
@@ -166,6 +168,8 @@ namespace UnityOnlineProjectServer.Content.GameObject.Implements
             var cannonRotationVector = NumericParser.ParseVector(rawCannonRotationVector);
             var rawCannonRotationDelta = message.body.Any["CannonRotationDelta"];
             var cannonRotationDelta = float.Parse(rawCannonRotationDelta);
+            var rawFrameRate = message.body.Any["FrameRate"];
+            var frameRate = float.Parse(rawFrameRate);
 
             _moveDirection = moveDirection;
             _moveDelta = moveDelta;
@@ -176,6 +180,7 @@ namespace UnityOnlineProjectServer.Content.GameObject.Implements
             _towerRotationDelta = towerRotationDelta;
             _cannonRotationVector = cannonRotationVector;
             _cannonRotationDelta = cannonRotationDelta;
+            _frameRate = frameRate;
 
             //Update Time
             RecentMovingReceivedTime = DateTime.Now;
