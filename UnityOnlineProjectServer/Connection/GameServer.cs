@@ -7,12 +7,13 @@ using System.Numerics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Hosting;
 using UnityOnlineProjectServer.Content.Map;
 using UnityOnlineProjectServer.Utility;
 
 namespace UnityOnlineProjectServer.Connection
 {
-    public class GameServer
+    public class GameServer : BackgroundService
     {
         public bool isRun;
         public TcpListener listener;
@@ -25,6 +26,27 @@ namespace UnityOnlineProjectServer.Connection
         public ConcurrentDictionary<long, GameChannel> channels;
 
         public EventHandler ServerShutdownEvent;
+
+        protected override Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            return new Task(() =>
+            {
+                Logger.Instance.InfoLog("Server Start with systemd HostService");
+
+                ThreadPool.SetMinThreads(4, 1);
+
+                ManualResetEventSlim manualResetEvent = new ManualResetEventSlim(false);
+
+                GameServer newServer = new GameServer();
+                newServer.Start();
+                newServer.ServerShutdownEvent += (sender, arg) =>
+                {
+                    manualResetEvent.Set();
+                };
+
+                manualResetEvent.Wait(stoppingToken);
+            });
+        }
 
         public GameServer()
         {

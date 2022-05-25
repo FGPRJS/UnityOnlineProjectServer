@@ -2,6 +2,9 @@
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using UnityOnlineProjectServer.Connection;
 using UnityOnlineProjectServer.Content.Map;
 using UnityOnlineProjectServer.Utility;
@@ -10,11 +13,28 @@ namespace UnityOnlineProjectServer
 {
     public class Program
     {
+        public static IHostBuilder CreateHostBuilder(string[] args) =>
+
+            Host.CreateDefaultBuilder(args)
+                .UseSystemd()
+                .ConfigureServices((hostContext, services) =>
+                {
+                    services.AddHostedService<GameServer>();
+                });
+
+
         static void Main(string[] args)
         {
-            ThreadPool.SetMinThreads(3, 1);
+            bool isDebug = false;
 
-            Logger.Instance.InfoLog("Server turned on");
+            if ((args.Length > 0) && (args[0].ToLower() == "debug"))
+            {
+                isDebug = true;
+            }
+
+            ThreadPool.SetMinThreads(4, 1);
+
+            Logger.Instance.InfoLog("Server start with main");
             Logger.Instance.InfoLog("---Server Spec Info---");
             Logger.Instance.InfoLog($"Processor Count : {Environment.ProcessorCount}");
             ThreadPool.GetAvailableThreads(out var worker, out var asyncIO);
@@ -27,17 +47,15 @@ namespace UnityOnlineProjectServer
             Logger.Instance.InfoLog("Server process ON.");
 
             bool isRun = true;
-            bool isDebug = false;
 
-            if((args.Length > 0) && (args[0].ToLower() == "debug"))
+            if (isDebug)
             {
-                isDebug = true;
-            }
-
-            if(isDebug)
                 server.StartLocal();
+            }
             else
+            {
                 server.Start();
+            }
 
             ManualResetEvent _quitEvent = new ManualResetEvent(false);
 
